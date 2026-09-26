@@ -3,6 +3,7 @@ module.exports = {
   siteSubtitle: "Staff Panel",
   logo: "https://cdn.phototourl.com/member/2026-09-25-72dbe19e-0086-4a2b-b1ee-ee3e00a43c97.png",
   loginLogo: "https://cdn.phototourl.com/member/2026-09-25-72dbe19e-0086-4a2b-b1ee-ee3e00a43c97.png",
+  favicon: "https://cdn.phototourl.com/member/2026-09-25-72dbe19e-0086-4a2b-b1ee-ee3e00a43c97.png",
   roles: {
     webAccess: "KEY | Web",
     botManagement: "KEY | Bot Management",
