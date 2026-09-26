@@ -19,33 +19,27 @@ const files = {
   announcements: path.join(dataDir, 'announcements.json'),
   chat: path.join(dataDir, 'staffchat.json'),
   audit: path.join(dataDir, 'audit.json'),
-  profiles: path.join(dataDir, 'profiles.json')
+  profiles: path.join(dataDir, 'profiles.json'),
+  macros: path.join(dataDir, 'macros.json')
 };
 
-for (const [key, file] of Object.entries(files)) {
-  if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, key === 'profiles' ? '{}' : '[]');
+for (const key of Object.keys(files)) {
+  if (!fs.existsSync(files[key])) {
+    fs.writeFileSync(files[key], key === 'profiles' ? '{}' : '[]');
   }
 }
 
 function read(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
-
 function save(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
-
 function addAudit(entry) {
   const logs = read(files.audit);
-  logs.push({
-    id: Date.now().toString(),
-    ...entry,
-    at: new Date().toISOString()
-  });
+  logs.push({ id: Date.now().toString(), ...entry, at: new Date().toISOString() });
   save(files.audit, logs.slice(-2000));
 }
-
 function getProfile(userId) {
   const all = read(files.profiles);
   return all[userId] || {
@@ -59,7 +53,6 @@ function getProfile(userId) {
     collapseSidebar: false
   };
 }
-
 function saveProfile(userId, data) {
   const all = read(files.profiles);
   all[userId] = { ...getProfile(userId), ...data };
@@ -68,7 +61,6 @@ function saveProfile(userId, data) {
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
-
 passport.use(new DiscordStrategy({
   clientID: process.env.DISCORD_CLIENT_ID,
   clientSecret: process.env.DISCORD_CLIENT_SECRET,
@@ -97,11 +89,8 @@ async function getMemberRoles(userId) {
     if (!res.ok) return [];
     const data = await res.json();
     return data.roles || [];
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
-
 async function getGuildRoles() {
   try {
     const res = await fetch(`https://discord.com/api/v10/guilds/${process.env.GUILD_ID}/roles`, {
@@ -109,48 +98,32 @@ async function getGuildRoles() {
     });
     if (!res.ok) return [];
     return await res.json();
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
-
 async function getHighestRoleName(userId) {
   try {
     const memberRoles = await getMemberRoles(userId);
     const guildRoles = await getGuildRoles();
-    const userRoles = guildRoles
-      .filter(r => memberRoles.includes(r.id))
-      .sort((a, b) => b.position - a.position);
+    const userRoles = guildRoles.filter(r => memberRoles.includes(r.id)).sort((a, b) => b.position - a.position);
     return userRoles[0] ? userRoles[0].name : 'Staff';
-  } catch (e) {
-    return 'Staff';
-  }
+  } catch (e) { return 'Staff'; }
 }
-
 function containsBadWord(text) {
   const lower = String(text || '').toLowerCase();
-  return config.badWords.some(word => lower.includes(word));
+  return config.badWords.some(w => lower.includes(w));
 }
-
 async function dmUser(userId, embed) {
   try {
     const dmRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
       method: 'POST',
-      headers: {
-        Authorization: `Bot ${process.env.BOT_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { Authorization: `Bot ${process.env.BOT_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipient_id: userId })
     });
     const dm = await dmRes.json();
     if (!dm.id) return false;
-
     await fetch(`https://discord.com/api/v10/channels/${dm.id}/messages`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bot ${process.env.BOT_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { Authorization: `Bot ${process.env.BOT_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ embeds: [embed] })
     });
     return true;
@@ -159,21 +132,17 @@ async function dmUser(userId, embed) {
     return false;
   }
 }
-
 async function checkAccess(req, res, next) {
   if (!req.isAuthenticated()) return res.redirect('/login');
-
   const memberRoles = await getMemberRoles(req.user.id);
   const guildRoles = await getGuildRoles();
   const webRole = guildRoles.find(r => r.name === config.roles.webAccess);
   const botRole = guildRoles.find(r => r.name === config.roles.botManagement);
   const hasWeb = webRole && memberRoles.includes(webRole.id);
   const hasBot = botRole && memberRoles.includes(botRole.id);
-
   if (!hasWeb && !hasBot) {
     return res.send(`<!DOCTYPE html><html><body style="background:#0b1120;color:#fff;font-family:sans-serif;display:flex;height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Access Denied</h1><p>You need <b>${config.roles.webAccess}</b></p><a href="/logout" style="color:#0ea5e9">Logout</a></div></body></html>`);
   }
-
   req.user.hasBotManagement = !!hasBot;
   next();
 }
@@ -181,7 +150,6 @@ async function checkAccess(req, res, next) {
 function layout(user, title, content, highestRank) {
   highestRank = highestRank || 'Staff';
   const isManager = user.hasBotManagement;
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -191,13 +159,11 @@ function layout(user, title, content, highestRank) {
 <style>
 :root{--bg:${config.colors.background};--card:${config.colors.card};--primary:${config.colors.primary};--text:${config.colors.text};--muted:${config.colors.muted};--border:#334155}
 body.light{--bg:#f1f5f9;--card:#fff;--text:#0f172a;--muted:#64748b;--border:#e2e8f0}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .sidebar{width:260px;background:var(--card);border-right:1px solid var(--border);height:100vh;position:fixed;padding:24px 16px;display:flex;flex-direction:column}
 .logo{display:flex;align-items:center;gap:12px;margin-bottom:32px;padding:0 8px}
 .logo img{width:42px;height:42px;border-radius:8px;object-fit:cover}
-.logo-text{font-weight:700;font-size:15px;line-height:1.2}
-.logo-text span{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.logo-text{font-weight:700;font-size:15px;line-height:1.2}.logo-text span{display:block;font-size:11px;color:var(--muted);font-weight:500}
 .nav a{display:block;padding:12px 14px;border-radius:8px;color:var(--muted);text-decoration:none;margin-bottom:4px;font-size:14px}
 .nav a:hover,.nav a.active{background:rgba(14,165,233,.12);color:var(--primary)}
 .main{margin-left:260px;padding:28px 36px}
@@ -205,34 +171,29 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min
 .profile{display:flex;align-items:center;gap:12px;background:var(--card);padding:8px 14px 8px 8px;border-radius:50px;border:1px solid var(--border)}
 .profile img{width:36px;height:36px;border-radius:50%}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px}
-h1{font-size:26px}h2{font-size:18px;margin-bottom:12px}
-.muted{color:var(--muted);font-size:14px}
+h1{font-size:26px}h2{font-size:18px;margin-bottom:12px}.muted{color:var(--muted);font-size:14px}
 .btn{background:var(--primary);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block;font-size:14px}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
 input,textarea,select{width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);margin:8px 0 12px;font-size:14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .badge{display:inline-block;background:rgba(14,165,233,.15);color:var(--primary);font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600}
 .msg{padding:12px;border-radius:10px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border)}
-.msg.staff{border-left:3px solid var(--primary)}
-.msg.user{border-left:3px solid #22c55e}
+.msg.staff{border-left:3px solid var(--primary)}.msg.user{border-left:3px solid #22c55e}
 @media(max-width:900px){.sidebar{display:none}.main{margin-left:0}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="logo">
-    <img src="${config.logo}" alt="Logo"/>
-    <div class="logo-text">${config.siteName}<span>${config.siteSubtitle}</span></div>
-  </div>
+  <div class="logo"><img src="${config.logo}" alt="Logo"/><div class="logo-text">${config.siteName}<span>${config.siteSubtitle}</span></div></div>
   <div class="nav">
-    <a href="/dashboard" class="${title === 'Dashboard' ? 'active' : ''}">Dashboard</a>
-    <a href="/loa" class="${title === 'LOA' ? 'active' : ''}">Leave of Absence</a>
-    <a href="/tickets" class="${title === 'Tickets' ? 'active' : ''}">Tickets / ModMail</a>
-    <a href="/settings" class="${title === 'Settings' ? 'active' : ''}">Settings</a>
+    <a href="/dashboard" class="${title==='Dashboard'?'active':''}">Dashboard</a>
+    <a href="/loa" class="${title==='LOA'?'active':''}">Leave of Absence</a>
+    <a href="/support" class="${title==='Support'?'active':''}">Support</a>
+    <a href="/settings" class="${title==='Settings'?'active':''}">Settings</a>
     ${isManager ? `
-      <a href="/announcements" class="${title === 'Announcements' ? 'active' : ''}">Announcements</a>
-      <a href="/notifications" class="${title === 'Notifications' ? 'active' : ''}">Staff Notifications</a>
-      <a href="/logs" class="${title === 'Logs' ? 'active' : ''}">Logs</a>
+      <a href="/announcements" class="${title==='Announcements'?'active':''}">Announcements</a>
+      <a href="/notifications" class="${title==='Notifications'?'active':''}">Staff Notifications</a>
+      <a href="/logs" class="${title==='Logs'?'active':''}">Logs</a>
     ` : ''}
     <a href="/logout" style="margin-top:auto;color:#f87171">Logout</a>
   </div>
@@ -244,34 +205,20 @@ input,textarea,select{width:100%;padding:11px 14px;border-radius:8px;border:1px 
       <button class="btn btn-outline" onclick="toggleTheme()" style="padding:8px 12px">Theme</button>
       <div class="profile">
         <img src="${user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : 'https://via.placeholder.com/36'}" alt=""/>
-        <div style="font-size:13px;line-height:1.2">
-          <div style="font-weight:600">${user.username}</div>
-          <div class="muted" style="font-size:11px">${highestRank}</div>
-        </div>
+        <div style="font-size:13px;line-height:1.2"><div style="font-weight:600">${user.username}</div><div class="muted" style="font-size:11px">${highestRank}</div></div>
       </div>
     </div>
   </div>
   ${content}
 </div>
 <script>
-function toggleTheme(){
-  document.body.classList.toggle('light');
-  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
-}
-if(localStorage.getItem('theme') === 'light') document.body.classList.add('light');
-let idle = 0;
-const maxIdle = 30;
-function resetIdle(){ idle = 0; }
-setInterval(function(){
-  idle++;
-  if(idle >= maxIdle) location.href = '/logout';
-}, 60000);
-['load','mousemove','keypress','click','scroll'].forEach(function(e){
-  window.addEventListener(e, resetIdle);
-});
+function toggleTheme(){document.body.classList.toggle('light');localStorage.setItem('theme',document.body.classList.contains('light')?'light':'dark')}
+if(localStorage.getItem('theme')==='light')document.body.classList.add('light');
+var idle=0;function resetIdle(){idle=0}
+setInterval(function(){idle++;if(idle>=30)location.href='/logout'},60000);
+['load','mousemove','keypress','click','scroll'].forEach(function(e){window.addEventListener(e,resetIdle)});
 </script>
-</body>
-</html>`;
+</body></html>`;
 }
 
 app.get('/', function(req, res) {
@@ -281,52 +228,40 @@ app.get('/', function(req, res) {
 
 app.get('/login', function(req, res) {
   res.send(`<!DOCTYPE html><html><head><title>Login</title>
-<style>
-body{margin:0;font-family:system-ui;background:#0b1120;color:#fff;display:flex;height:100vh;align-items:center;justify-content:center}
+<style>body{margin:0;font-family:system-ui;background:#0b1120;color:#fff;display:flex;height:100vh;align-items:center;justify-content:center}
 .box{background:#1e293b;padding:48px;border-radius:16px;text-align:center;width:380px;border:1px solid #334155}
 img{width:64px;height:64px;border-radius:12px;margin-bottom:20px}
-a{display:inline-block;background:#5865F2;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:20px}
-</style></head>
-<body>
-<div class="box">
-  <img src="${config.loginLogo}" alt=""/>
-  <h1>${config.siteName}</h1>
-  <p style="color:#94a3b8">Staff Panel</p>
-  <a href="/auth/discord">Login with Discord</a>
-</div>
-</body></html>`);
+a{display:inline-block;background:#5865F2;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:20px}</style></head>
+<body><div class="box"><img src="${config.loginLogo}" alt=""/><h1>${config.siteName}</h1><p style="color:#94a3b8">Staff Panel</p><a href="/auth/discord">Login with Discord</a></div></body></html>`);
 });
 
 app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/auth/discord/callback',
-  passport.authenticate('discord', { failureRedirect: '/login' }),
-  function(req, res) { res.redirect('/dashboard'); }
-);
-
+app.get('/auth/discord/callback', passport.authenticate('discord', { failureRedirect: '/login' }), function(req, res) {
+  res.redirect('/dashboard');
+});
 app.get('/logout', function(req, res) {
   req.logout(function() { res.redirect('/login'); });
 });
 
+// ===== MODMAIL API =====
 app.post('/api/modmail/ticket', function(req, res) {
   if (req.headers['x-modmail-secret'] !== process.env.MODMAIL_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-
   const userId = req.body.userId;
   const username = req.body.username || 'Unknown';
   const content = req.body.content;
   const tickets = read(files.tickets);
-
-  let ticket = tickets.find(function(t) {
-    return t.userId === userId && t.status !== 'closed';
-  });
+  let ticket = tickets.find(function(t) { return t.userId === userId && t.status !== 'closed' && t.status !== 'resolved'; });
 
   if (!ticket) {
     ticket = {
       id: Date.now().toString(),
       userId: userId,
       username: username,
-      status: 'open',
+      status: 'pending_staff',
+      priority: 'normal',
+      type: 'general',
       claimedBy: null,
       claimedByName: null,
       subject: 'ModMail',
@@ -334,6 +269,8 @@ app.post('/api/modmail/ticket', function(req, res) {
       createdAt: new Date().toISOString()
     };
     tickets.push(ticket);
+  } else {
+    if (ticket.status === 'pending_user' || ticket.status === 'resolved') ticket.status = 'pending_staff';
   }
 
   if (content) {
@@ -344,280 +281,346 @@ app.post('/api/modmail/ticket', function(req, res) {
       timestamp: new Date().toISOString()
     });
   }
-
   save(files.tickets, tickets);
   res.json({ success: true, ticket: ticket });
 });
 
+// ===== DASHBOARD =====
 app.get('/dashboard', checkAccess, async function(req, res) {
   const announcements = read(files.announcements);
   const latest = announcements[announcements.length - 1];
   const chat = read(files.chat).slice(-40).reverse();
   const qotd = config.questionsOfTheDay[new Date().getDate() % config.questionsOfTheDay.length];
   const highestRank = await getHighestRoleName(req.user.id);
-
   const chatHTML = chat.map(function(m) {
     return `<div style="padding:12px 0;border-bottom:1px solid var(--border)"><strong>${m.username}</strong> <span class="muted" style="font-size:12px">${new Date(m.createdAt).toLocaleString()}</span><p style="margin-top:5px">${m.content}</p></div>`;
   }).join('') || '<p class="muted">No messages yet.</p>';
-
-  const latestHTML = latest
-    ? `<p><strong>${latest.title}</strong></p><p class="muted">${latest.content}</p><small class="muted">By ${latest.author}</small>`
-    : '<p class="muted">None yet</p>';
+  const latestHTML = latest ? `<p><strong>${latest.title}</strong></p><p class="muted">${latest.content}</p><small class="muted">By ${latest.author}</small>` : '<p class="muted">None yet</p>';
 
   res.send(layout(req.user, 'Dashboard', `
     <div class="card"><h2>Welcome back, ${req.user.username}</h2><p class="muted">Highest Rank: <strong>${highestRank}</strong></p></div>
     <div class="grid">
       <div class="card"><h2>Latest Announcement</h2>${latestHTML}</div>
       <div class="card"><h2>Question of the Day</h2><p style="margin-bottom:14px">${qotd}</p>
-        <form method="POST" action="/chat/post"><input type="hidden" name="type" value="qotd"/><textarea name="content" required rows="3" placeholder="Your answer..."></textarea><button class="btn" type="submit">Post Answer</button></form>
-      </div>
+        <form method="POST" action="/chat/post"><input type="hidden" name="type" value="qotd"/><textarea name="content" required rows="3"></textarea><button class="btn" type="submit">Post Answer</button></form></div>
     </div>
-    <div class="card"><h2>Staff Chat</h2>
-      <div style="max-height:400px;overflow-y:auto;margin-bottom:16px">${chatHTML}</div>
-      <form method="POST" action="/chat/post"><input type="hidden" name="type" value="chat"/><textarea name="content" required rows="2" placeholder="Message..."></textarea><button class="btn" type="submit">Send</button></form>
-    </div>
+    <div class="card"><h2>Staff Chat</h2><div style="max-height:400px;overflow-y:auto;margin-bottom:16px">${chatHTML}</div>
+      <form method="POST" action="/chat/post"><input type="hidden" name="type" value="chat"/><textarea name="content" required rows="2"></textarea><button class="btn" type="submit">Send</button></form></div>
   `, highestRank));
 });
 
 app.post('/chat/post', checkAccess, function(req, res) {
   const content = String(req.body.content || '').trim();
   if (!content) return res.redirect('/dashboard');
-  if (containsBadWord(content)) {
-    return res.send('<p style="color:#fff;background:#0b1120;padding:40px;text-align:center">Message blocked. <a href="/dashboard" style="color:#0ea5e9">Back</a></p>');
-  }
-
+  if (containsBadWord(content)) return res.send('<p style="color:#fff;background:#0b1120;padding:40px;text-align:center">Blocked. <a href="/dashboard" style="color:#0ea5e9">Back</a></p>');
   const chat = read(files.chat);
-  chat.push({
-    id: Date.now(),
-    userId: req.user.id,
-    username: req.user.username,
-    content: content,
-    type: req.body.type || 'chat',
-    createdAt: new Date().toISOString()
-  });
+  chat.push({ id: Date.now(), userId: req.user.id, username: req.user.username, content: content, type: req.body.type || 'chat', createdAt: new Date().toISOString() });
   save(files.chat, chat);
   addAudit({ type: 'staff_chat', actorId: req.user.id, actor: req.user.username, detail: content.slice(0, 200) });
   res.redirect('/dashboard');
 });
 
-app.get('/tickets', checkAccess, async function(req, res) {
-  const tickets = read(files.tickets).filter(function(t) { return t.status !== 'closed'; }).reverse();
+// ===== SUPPORT QUEUE =====
+app.get('/support', checkAccess, async function(req, res) {
   const highestRank = await getHighestRoleName(req.user.id);
-
-  const list = tickets.map(function(t) {
-    const last = t.messages && t.messages.length ? t.messages[t.messages.length - 1].content : '';
-    return `<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-        <div>
-          <strong>${t.username}</strong>
-          <span class="muted">#${t.id}</span>
-          <span class="badge" style="margin-left:8px">${t.status}</span>
-          ${t.claimedByName ? `<span class="muted" style="margin-left:8px">Claimed by ${t.claimedByName}</span>` : ''}
-        </div>
-        <a class="btn" href="/tickets/${t.id}">Open</a>
-      </div>
-      <p class="muted" style="margin-top:8px">${String(last).slice(0, 140)}</p>
-    </div>`;
-  }).join('') || '<p class="muted">No open tickets</p>';
-
-  res.send(layout(req.user, 'Tickets', `<h2 style="margin-bottom:16px">Open ModMail Tickets</h2>${list}`, highestRank));
-});
-
-app.get('/tickets/:id', checkAccess, async function(req, res) {
   const tickets = read(files.tickets);
-  const ticket = tickets.find(function(t) { return t.id === req.params.id; });
-  if (!ticket) return res.redirect('/tickets');
+  const open = tickets.filter(t => ['open', 'claimed', 'pending_staff'].includes(t.status));
+  const waitingUser = tickets.filter(t => t.status === 'pending_user');
+  const resolved = tickets.filter(t => t.status === 'resolved' || t.status === 'closed');
 
-  const highestRank = await getHighestRoleName(req.user.id);
-  const messages = (ticket.messages || []).map(function(m) {
-    return `<div class="msg ${m.from}">
-      <strong>${m.author}</strong>
-      <span class="muted" style="font-size:12px">${new Date(m.timestamp).toLocaleString()}</span>
-      <p style="margin-top:6px">${m.content}</p>
-    </div>`;
-  }).join('') || '<p class="muted">No messages</p>';
+  const status = req.query.status || 'all';
+  const priority = req.query.priority || 'all';
+  const assigned = req.query.assigned || 'all';
+  const q = String(req.query.q || '').toLowerCase();
 
-  let actions = '';
-  if (ticket.status === 'open') {
-    actions = `<form method="POST" action="/tickets/${ticket.id}/claim"><button class="btn" type="submit">Claim Ticket</button></form>`;
-  } else if (ticket.status === 'claimed') {
-    actions = `
-      <form method="POST" action="/tickets/${ticket.id}/reply">
-        <textarea name="content" required rows="3" placeholder="Reply to user..."></textarea>
-        <button class="btn" type="submit">Send Reply</button>
-      </form>
-      <button class="btn btn-outline" type="button" style="margin-top:10px" onclick="openCloseModal()">Close Ticket</button>
-      <div id="closeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;align-items:center;justify-content:center">
-        <div class="card" style="max-width:420px;margin:auto">
-          <h2>Close this ticket?</h2>
-          <p class="muted" style="margin:12px 0">This cannot be easily undone.</p>
-          <div style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn btn-outline" type="button" onclick="closeCloseModal()">Cancel</button>
-            <form method="POST" action="/tickets/${ticket.id}/close" style="margin:0">
-              <button id="confirmCloseBtn" class="btn" type="submit" disabled style="background:#6b7280">Wait...</button>
-            </form>
-          </div>
+  let filtered = tickets.slice().reverse();
+  if (status !== 'all') filtered = filtered.filter(t => t.status === status);
+  if (priority !== 'all') filtered = filtered.filter(t => (t.priority || 'normal') === priority);
+  if (assigned === 'me') filtered = filtered.filter(t => t.claimedBy === req.user.id);
+  if (assigned === 'unassigned') filtered = filtered.filter(t => !t.claimedBy);
+  if (q) filtered = filtered.filter(t => String(t.username||'').toLowerCase().includes(q) || String(t.userId||'').includes(q) || String(t.id||'').includes(q));
+
+  const cards = filtered.map(function(t) {
+    const last = t.messages && t.messages.length ? t.messages[t.messages.length - 1] : null;
+    return `<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div>
+      <strong>${t.username}</strong> <span class="muted">#${t.id}</span>
+      <span class="badge">${t.type || 'general'}</span>
+      <span class="badge">${t.status}</span>
+      <span class="badge">${t.priority || 'normal'}</span>
+      <p class="muted" style="margin-top:6px">${last ? last.content.slice(0,120) : 'No messages'}</p>
+      <small class="muted">${last ? 'Last: ' + new Date(last.timestamp).toLocaleString() + ' by ' + last.author : ''} ${t.claimedByName ? ' • Assigned: ' + t.claimedByName : ' • Unassigned'} • ${(t.messages||[]).length} messages</small>
+    </div><a class="btn" href="/support/ticket/${t.id}">Open</a></div></div>`;
+  }).join('') || '<p class="muted">No tickets found.</p>';
+
+  res.send(layout(req.user, 'Support', `
+    <div class="grid">
+      <div class="card"><h2>${open.length}</h2><p class="muted">Open / Pending Staff</p></div>
+      <div class="card"><h2>${waitingUser.length}</h2><p class="muted">Waiting on User</p></div>
+      <div class="card"><h2>${resolved.length}</h2><p class="muted">Resolved / Closed</p></div>
+      <div class="card"><h2>${tickets.length}</h2><p class="muted">Total</p></div>
+    </div>
+    <div class="card"><h2>Queue</h2>
+      <form method="GET" action="/support" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+        <div><label class="muted">Search</label><input name="q" value="${req.query.q || ''}" placeholder="Username, ID..."/></div>
+        <div><label class="muted">Status</label>
+          <select name="status">
+            <option value="all">All</option>
+            <option value="pending_staff" ${status==='pending_staff'?'selected':''}>Pending Staff</option>
+            <option value="pending_user" ${status==='pending_user'?'selected':''}>Pending User</option>
+            <option value="claimed" ${status==='claimed'?'selected':''}>Claimed</option>
+            <option value="resolved" ${status==='resolved'?'selected':''}>Resolved</option>
+            <option value="closed" ${status==='closed'?'selected':''}>Closed</option>
+          </select>
         </div>
-      </div>
-      <script>
-        function openCloseModal(){
-          var modal = document.getElementById('closeModal');
-          var btn = document.getElementById('confirmCloseBtn');
-          modal.style.display = 'flex';
-          btn.disabled = true;
-          btn.style.background = '#6b7280';
-          btn.textContent = 'Wait...';
-          setTimeout(function(){
-            btn.disabled = false;
-            btn.style.background = '#dc2626';
-            btn.textContent = 'Yes, close ticket';
-          }, 2000);
-        }
-        function closeCloseModal(){
-          document.getElementById('closeModal').style.display = 'none';
-        }
-      </script>`;
-  }
-
-  res.send(layout(req.user, 'Tickets', `
-    <div class="card">
-      <h2>${ticket.username}</h2>
-      <p class="muted">Ticket #${ticket.id} • ${ticket.userId} • Status: <strong>${ticket.status}</strong>${ticket.claimedByName ? ' • Claimed by ' + ticket.claimedByName : ''}</p>
+        <div><label class="muted">Priority</label>
+          <select name="priority">
+            <option value="all">All</option>
+            <option value="low" ${priority==='low'?'selected':''}>Low</option>
+            <option value="normal" ${priority==='normal'?'selected':''}>Normal</option>
+            <option value="high" ${priority==='high'?'selected':''}>High</option>
+            <option value="urgent" ${priority==='urgent'?'selected':''}>Urgent</option>
+          </select>
+        </div>
+        <div><label class="muted">Assigned</label>
+          <select name="assigned">
+            <option value="all">Everyone</option>
+            <option value="me" ${assigned==='me'?'selected':''}>Me</option>
+            <option value="unassigned" ${assigned==='unassigned'?'selected':''}>Unassigned</option>
+          </select>
+        </div>
+        <button class="btn" type="submit">Filter</button>
+      </form>
     </div>
-    <div class="card">
-      <h2>Conversation</h2>
-      <div style="max-height:450px;overflow-y:auto;margin-bottom:16px">${messages}</div>
-      ${actions}
-    </div>
-    <a href="/tickets" class="btn btn-outline">Back</a>
+    <div style="margin-bottom:12px"><a class="btn btn-outline" href="/support/macros">Macros</a></div>
+    ${cards}
   `, highestRank));
 });
 
-app.post('/tickets/:id/claim', checkAccess, async function(req, res) {
+// ===== MACROS =====
+app.get('/support/macros', checkAccess, async function(req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const macros = read(files.macros);
+  const list = macros.map(function(m) {
+    return `<div class="card"><strong>${m.title}</strong> <span class="badge">${m.active?'Active':'Inactive'}</span>
+      <p class="muted" style="margin-top:8px">${m.content}</p>
+      <form method="POST" action="/support/macros/${m.id}/toggle" style="display:inline"><button class="btn btn-outline" type="submit">${m.active?'Set Inactive':'Set Active'}</button></form>
+      <form method="POST" action="/support/macros/${m.id}/delete" style="display:inline;margin-left:8px"><button class="btn btn-outline" type="submit">Delete</button></form>
+    </div>`;
+  }).join('') || '<p class="muted">No macros yet.</p>';
+
+  res.send(layout(req.user, 'Support', `
+    <div class="card"><h2>Create Macro</h2>
+      <p class="muted">Variables: {{username}} {{id}}</p>
+      <form method="POST" action="/support/macros/create">
+        <input name="title" required placeholder="Title"/>
+        <textarea name="content" required rows="4" placeholder="Hello {{username}}..."></textarea>
+        <button class="btn" type="submit">Save Macro</button>
+      </form>
+    </div>
+    <h2 style="margin:18px 0 12px">Saved Macros</h2>${list}
+    <a class="btn btn-outline" href="/support">Back</a>
+  `, highestRank));
+});
+
+app.post('/support/macros/create', checkAccess, function(req, res) {
+  const macros = read(files.macros);
+  macros.push({ id: Date.now().toString(), title: req.body.title, content: req.body.content, active: true, createdBy: req.user.username, createdAt: new Date().toISOString() });
+  save(files.macros, macros);
+  addAudit({ type: 'macro_create', actorId: req.user.id, actor: req.user.username, detail: req.body.title });
+  res.redirect('/support/macros');
+});
+app.post('/support/macros/:id/toggle', checkAccess, function(req, res) {
+  const macros = read(files.macros);
+  const m = macros.find(x => x.id === req.params.id);
+  if (m) m.active = !m.active;
+  save(files.macros, macros);
+  res.redirect('/support/macros');
+});
+app.post('/support/macros/:id/delete', checkAccess, function(req, res) {
+  save(files.macros, read(files.macros).filter(x => x.id !== req.params.id));
+  res.redirect('/support/macros');
+});
+
+// ===== TICKET DETAIL =====
+app.get('/support/ticket/:id', checkAccess, async function(req, res) {
   const tickets = read(files.tickets);
-  const ticket = tickets.find(function(t) { return t.id === req.params.id; });
-  if (ticket && ticket.status === 'open') {
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (!ticket) return res.redirect('/support');
+  const highestRank = await getHighestRoleName(req.user.id);
+  const macros = read(files.macros).filter(m => m.active);
+
+  let memberInfo = { username: ticket.username, id: ticket.userId, avatar: null };
+  try {
+    const ures = await fetch('https://discord.com/api/v10/users/' + ticket.userId, { headers: { Authorization: 'Bot ' + process.env.BOT_TOKEN } });
+    if (ures.ok) {
+      const u = await ures.json();
+      memberInfo.username = u.username;
+      if (u.avatar) memberInfo.avatar = 'https://cdn.discordapp.com/avatars/' + u.id + '/' + u.avatar + '.png';
+    }
+  } catch (e) {}
+
+  const messages = (ticket.messages || []).map(function(m) {
+    return `<div class="msg ${m.from}"><strong>${m.author}</strong>${m.internal ? ' <span class="badge">Internal</span>' : ''}
+      <span class="muted" style="font-size:12px">${new Date(m.timestamp).toLocaleString()}</span>
+      <p style="margin-top:6px">${m.content}</p></div>`;
+  }).join('') || '<p class="muted">No messages</p>';
+
+  const macroOptions = macros.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+
+  res.send(layout(req.user, 'Support', `
+    <div class="grid" style="grid-template-columns:2fr 1fr">
+      <div>
+        <div class="card"><h2>${ticket.username}</h2>
+          <p class="muted">${ticket.type||'general'} • #${ticket.id} • Status: <strong>${ticket.status}</strong> • Priority: <strong>${ticket.priority||'normal'}</strong>${ticket.claimedByName?' • Assigned: '+ticket.claimedByName:''}</p>
+        </div>
+        <div class="card"><h2>Conversation</h2>
+          <div style="max-height:420px;overflow-y:auto;margin-bottom:14px">${messages}</div>
+          <form method="POST" action="/support/ticket/${ticket.id}/reply">
+            <label class="muted">Reply type</label>
+            <select name="replyType"><option value="public">Public Reply</option><option value="internal">Internal Note</option></select>
+            <label class="muted">Macro</label>
+            <select name="macroId"><option value="">None</option>${macroOptions}</select>
+            <textarea name="content" rows="4" placeholder="Message..."></textarea>
+            <button class="btn" type="submit">Send</button>
+          </form>
+          <button class="btn btn-outline" type="button" style="margin-top:10px" onclick="openCloseModal()">Close Ticket</button>
+          <div id="closeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;align-items:center;justify-content:center">
+            <div class="card" style="max-width:420px;margin:auto"><h2>Close this ticket?</h2>
+              <p class="muted" style="margin:12px 0">Are you sure?</p>
+              <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button class="btn btn-outline" type="button" onclick="closeCloseModal()">Cancel</button>
+                <form method="POST" action="/support/ticket/${ticket.id}/close" style="margin:0">
+                  <button id="confirmCloseBtn" class="btn" type="submit" disabled style="background:#6b7280">Wait...</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card"><h2>Member Lookup</h2>
+          <img src="${memberInfo.avatar || 'https://via.placeholder.com/64'}" style="width:64px;height:64px;border-radius:50%;margin-bottom:10px"/>
+          <p><strong>${memberInfo.username}</strong></p><p class="muted">${memberInfo.id}</p>
+        </div>
+        <div class="card"><h2>Status</h2>
+          <form method="POST" action="/support/ticket/${ticket.id}/status">
+            <select name="status">
+              <option value="pending_staff" ${ticket.status==='pending_staff'?'selected':''}>Pending Staff</option>
+              <option value="pending_user" ${ticket.status==='pending_user'?'selected':''}>Pending User</option>
+              <option value="claimed" ${ticket.status==='claimed'?'selected':''}>Claimed</option>
+              <option value="resolved" ${ticket.status==='resolved'?'selected':''}>Resolved</option>
+              <option value="closed" ${ticket.status==='closed'?'selected':''}>Closed</option>
+            </select>
+            <button class="btn" type="submit">Update Status</button>
+          </form>
+        </div>
+        <div class="card"><h2>Priority</h2>
+          <form method="POST" action="/support/ticket/${ticket.id}/priority">
+            <select name="priority">
+              <option value="low" ${(ticket.priority||'normal')==='low'?'selected':''}>Low</option>
+              <option value="normal" ${(ticket.priority||'normal')==='normal'?'selected':''}>Normal</option>
+              <option value="high" ${(ticket.priority||'normal')==='high'?'selected':''}>High</option>
+              <option value="urgent" ${(ticket.priority||'normal')==='urgent'?'selected':''}>Urgent</option>
+            </select>
+            <button class="btn" type="submit">Update Priority</button>
+          </form>
+        </div>
+        <div class="card"><h2>Assign</h2>
+          <form method="POST" action="/support/ticket/${ticket.id}/claim"><button class="btn" type="submit">Assign to Me</button></form>
+        </div>
+      </div>
+    </div>
+    <a class="btn btn-outline" href="/support">Back to Queue</a>
+    <script>
+      function openCloseModal(){var m=document.getElementById('closeModal');var b=document.getElementById('confirmCloseBtn');m.style.display='flex';b.disabled=true;b.style.background='#6b7280';b.textContent='Wait...';setTimeout(function(){b.disabled=false;b.style.background='#dc2626';b.textContent='Yes, close ticket'},2000)}
+      function closeCloseModal(){document.getElementById('closeModal').style.display='none'}
+    </script>
+  `, highestRank));
+});
+
+app.post('/support/ticket/:id/claim', checkAccess, async function(req, res) {
+  const tickets = read(files.tickets);
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (ticket) {
     ticket.status = 'claimed';
     ticket.claimedBy = req.user.id;
     ticket.claimedByName = req.user.username;
     save(files.tickets, tickets);
     addAudit({ type: 'ticket_claim', actorId: req.user.id, actor: req.user.username, detail: 'Claimed ' + ticket.username });
-    await dmUser(ticket.userId, {
-      color: 0x003768,
-      title: 'Ticket Claimed',
-      description: 'Your ticket has been claimed by **' + req.user.username + '**.\nStaff will reply here shortly.',
-      footer: { text: 'Lone Star College • ModMail' },
-      timestamp: new Date().toISOString()
-    });
+    await dmUser(ticket.userId, { color: 0x003768, title: 'Ticket Claimed', description: 'Your ticket has been claimed by **' + req.user.username + '**.', footer: { text: 'Lone Star College • ModMail' }, timestamp: new Date().toISOString() });
   }
-  res.redirect('/tickets/' + req.params.id);
+  res.redirect('/support/ticket/' + req.params.id);
 });
 
-app.post('/tickets/:id/reply', checkAccess, async function(req, res) {
-  const content = String(req.body.content || '').trim();
-  if (!content) return res.redirect('/tickets/' + req.params.id);
-  if (containsBadWord(content)) return res.send('Blocked. <a href="/tickets">Back</a>');
-
+app.post('/support/ticket/:id/reply', checkAccess, async function(req, res) {
   const tickets = read(files.tickets);
-  const ticket = tickets.find(function(t) { return t.id === req.params.id; });
-  if (!ticket) return res.redirect('/tickets');
-
-  ticket.messages.push({
-    from: 'staff',
-    author: req.user.username,
-    content: content,
-    timestamp: new Date().toISOString()
-  });
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (!ticket) return res.redirect('/support');
+  let content = String(req.body.content || '').trim();
+  const replyType = req.body.replyType || 'public';
+  const macroId = req.body.macroId;
+  if (macroId) {
+    const macro = read(files.macros).find(m => m.id === macroId);
+    if (macro) content = macro.content.replace(/\{\{username\}\}/g, ticket.username).replace(/\{\{id\}\}/g, ticket.userId);
+  }
+  if (!content) return res.redirect('/support/ticket/' + req.params.id);
+  if (containsBadWord(content)) return res.send('Blocked. <a href="/support">Back</a>');
+  const isInternal = replyType === 'internal';
+  ticket.messages.push({ from: 'staff', author: req.user.username, content: content, internal: isInternal, timestamp: new Date().toISOString() });
+  if (!isInternal) {
+    ticket.status = 'pending_user';
+    await dmUser(ticket.userId, { color: 0x003768, title: 'Lone Star College Staff', description: content, footer: { text: 'Replied by ' + req.user.username }, timestamp: new Date().toISOString() });
+  }
   save(files.tickets, tickets);
-  addAudit({ type: 'ticket_reply', actorId: req.user.id, actor: req.user.username, detail: 'Replied to ' + ticket.username });
-
-  await dmUser(ticket.userId, {
-    color: 0x003768,
-    title: 'Lone Star College Staff',
-    description: content,
-    footer: { text: 'Replied by ' + req.user.username },
-    timestamp: new Date().toISOString()
-  });
-
-  res.redirect('/tickets/' + req.params.id);
+  addAudit({ type: isInternal ? 'ticket_note' : 'ticket_reply', actorId: req.user.id, actor: req.user.username, detail: ticket.username });
+  res.redirect('/support/ticket/' + req.params.id);
 });
 
-app.post('/tickets/:id/close', checkAccess, function(req, res) {
+app.post('/support/ticket/:id/status', checkAccess, function(req, res) {
   const tickets = read(files.tickets);
-  const ticket = tickets.find(function(t) { return t.id === req.params.id; });
-  if (ticket) {
-    ticket.status = 'closed';
-    save(files.tickets, tickets);
-    addAudit({ type: 'ticket_close', actorId: req.user.id, actor: req.user.username, detail: 'Closed ' + ticket.username });
-  }
-  res.redirect('/tickets');
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (ticket) { ticket.status = req.body.status; save(files.tickets, tickets); addAudit({ type: 'ticket_status', actorId: req.user.id, actor: req.user.username, detail: ticket.username + ' -> ' + req.body.status }); }
+  res.redirect('/support/ticket/' + req.params.id);
+});
+app.post('/support/ticket/:id/priority', checkAccess, function(req, res) {
+  const tickets = read(files.tickets);
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (ticket) { ticket.priority = req.body.priority; save(files.tickets, tickets); addAudit({ type: 'ticket_priority', actorId: req.user.id, actor: req.user.username, detail: ticket.username + ' -> ' + req.body.priority }); }
+  res.redirect('/support/ticket/' + req.params.id);
+});
+app.post('/support/ticket/:id/close', checkAccess, function(req, res) {
+  const tickets = read(files.tickets);
+  const ticket = tickets.find(t => t.id === req.params.id);
+  if (ticket) { ticket.status = 'closed'; save(files.tickets, tickets); addAudit({ type: 'ticket_close', actorId: req.user.id, actor: req.user.username, detail: 'Closed ' + ticket.username }); }
+  res.redirect('/support');
 });
 
+// ===== LOA =====
 app.get('/loa', checkAccess, async function(req, res) {
-  const loas = read(files.loa).filter(function(l) { return l.active; });
+  const loas = read(files.loa).filter(l => l.active);
   const highestRank = await getHighestRoleName(req.user.id);
-  const list = loas.map(function(l) {
-    return `<div class="card"><strong>${l.username}</strong> <span class="badge">Active</span><p class="muted">${l.reason}</p><small class="muted">${l.start} → ${l.end}</small></div>`;
-  }).join('') || '<p class="muted">No active LOAs</p>';
-
-  res.send(layout(req.user, 'LOA', `
-    <div class="card"><h2>Request LOA</h2>
-      <form method="POST" action="/loa/request">
-        <input name="reason" placeholder="Reason" required/>
-        <div class="grid"><input name="start" type="date" required/><input name="end" type="date" required/></div>
-        <button class="btn" type="submit">Submit</button>
-      </form>
-    </div>
-    <h2 style="margin:20px 0 12px">Active LOAs</h2>${list}
-  `, highestRank));
+  const list = loas.map(l => `<div class="card"><strong>${l.username}</strong> <span class="badge">Active</span><p class="muted">${l.reason}</p><small class="muted">${l.start} → ${l.end}</small></div>`).join('') || '<p class="muted">No active LOAs</p>';
+  res.send(layout(req.user, 'LOA', `<div class="card"><h2>Request LOA</h2><form method="POST" action="/loa/request"><input name="reason" required placeholder="Reason"/><div class="grid"><input name="start" type="date" required/><input name="end" type="date" required/></div><button class="btn" type="submit">Submit</button></form></div><h2 style="margin:20px 0 12px">Active LOAs</h2>${list}`, highestRank));
 });
-
 app.post('/loa/request', checkAccess, function(req, res) {
   const loas = read(files.loa);
-  loas.push({
-    id: Date.now(),
-    userId: req.user.id,
-    username: req.user.username,
-    reason: req.body.reason,
-    start: req.body.start,
-    end: req.body.end,
-    active: true,
-    createdAt: new Date().toISOString()
-  });
+  loas.push({ id: Date.now(), userId: req.user.id, username: req.user.username, reason: req.body.reason, start: req.body.start, end: req.body.end, active: true, createdAt: new Date().toISOString() });
   save(files.loa, loas);
   addAudit({ type: 'loa_request', actorId: req.user.id, actor: req.user.username, detail: req.body.reason });
   res.redirect('/loa');
 });
 
+// ===== ANNOUNCEMENTS / NOTIFICATIONS / LOGS / SETTINGS =====
 app.get('/announcements', checkAccess, async function(req, res) {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
   const highestRank = await getHighestRoleName(req.user.id);
-  const list = read(files.announcements).reverse().map(function(a) {
-    return `<div class="card"><strong>${a.title}</strong><p class="muted">${a.content}</p><small class="muted">By ${a.author}</small></div>`;
-  }).join('') || '<p class="muted">None</p>';
-
-  res.send(layout(req.user, 'Announcements', `
-    <div class="card"><h2>Post Announcement</h2>
-      <form method="POST" action="/announcements/create">
-        <input name="title" required placeholder="Title"/>
-        <textarea name="content" required rows="4" placeholder="Content"></textarea>
-        <button class="btn" type="submit">Post</button>
-      </form>
-    </div>
-    <h2 style="margin:20px 0 12px">Previous</h2>${list}
-  `, highestRank));
+  const list = read(files.announcements).reverse().map(a => `<div class="card"><strong>${a.title}</strong><p class="muted">${a.content}</p><small class="muted">By ${a.author}</small></div>`).join('') || '<p class="muted">None</p>';
+  res.send(layout(req.user, 'Announcements', `<div class="card"><h2>Post Announcement</h2><form method="POST" action="/announcements/create"><input name="title" required/><textarea name="content" required rows="4"></textarea><button class="btn" type="submit">Post</button></form></div><h2 style="margin:20px 0 12px">Previous</h2>${list}`, highestRank));
 });
-
 app.post('/announcements/create', checkAccess, function(req, res) {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
   const a = read(files.announcements);
-  a.push({
-    id: Date.now(),
-    title: req.body.title,
-    content: req.body.content,
-    author: req.user.username,
-    createdAt: new Date().toISOString()
-  });
+  a.push({ id: Date.now(), title: req.body.title, content: req.body.content, author: req.user.username, createdAt: new Date().toISOString() });
   save(files.announcements, a);
   addAudit({ type: 'announcement', actorId: req.user.id, actor: req.user.username, detail: req.body.title });
   res.redirect('/announcements');
@@ -626,126 +629,65 @@ app.post('/announcements/create', checkAccess, function(req, res) {
 app.get('/notifications', checkAccess, async function(req, res) {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
   const highestRank = await getHighestRoleName(req.user.id);
-  res.send(layout(req.user, 'Notifications', `
-    <div class="card"><h2>Send Staff Notification</h2>
-      <form method="POST" action="/notifications/send">
-        <input name="title" required placeholder="Title"/>
-        <textarea name="message" required rows="4" placeholder="Message"></textarea>
-        <button class="btn" type="submit">Send</button>
-      </form>
-    </div>
-  `, highestRank));
+  res.send(layout(req.user, 'Notifications', `<div class="card"><h2>Send Staff Notification</h2><form method="POST" action="/notifications/send"><input name="title" required/><textarea name="message" required rows="4"></textarea><button class="btn" type="submit">Send</button></form></div>`, highestRank));
 });
-
 app.post('/notifications/send', checkAccess, function(req, res) {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
-  addAudit({
-    type: 'notification',
-    actorId: req.user.id,
-    actor: req.user.username,
-    detail: req.body.title + ': ' + req.body.message
-  });
+  addAudit({ type: 'notification', actorId: req.user.id, actor: req.user.username, detail: req.body.title + ': ' + req.body.message });
   res.redirect('/notifications');
 });
 
 app.get('/logs', checkAccess, async function(req, res) {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
   const highestRank = await getHighestRoleName(req.user.id);
-  const logs = read(files.audit).slice().reverse().slice(0, 300);
-  const rows = logs.map(function(l) {
-    return `<div class="card" style="padding:14px">
-      <strong>${l.type}</strong>
-      <span class="muted" style="margin-left:8px">${new Date(l.at).toLocaleString()}</span>
-      <p style="margin-top:6px"><strong>${l.actor || 'System'}</strong>: ${l.detail || ''}</p>
-    </div>`;
-  }).join('') || '<p class="muted">No logs yet.</p>';
-
-  res.send(layout(req.user, 'Logs', `
-    <div class="card">
-      <h2>Website Audit Logs</h2>
-      <p class="muted">These cannot be deleted.</p>
-    </div>
-    ${rows}
-  `, highestRank));
+  const rows = read(files.audit).slice().reverse().slice(0, 300).map(l => `<div class="card" style="padding:14px"><strong>${l.type}</strong> <span class="muted">${new Date(l.at).toLocaleString()}</span><p style="margin-top:6px"><strong>${l.actor||'System'}</strong>: ${l.detail||''}</p></div>`).join('') || '<p class="muted">No logs yet.</p>';
+  res.send(layout(req.user, 'Logs', `<div class="card"><h2>Website Audit Logs</h2><p class="muted">These cannot be deleted.</p></div>${rows}`, highestRank));
 });
 
 app.get('/settings', checkAccess, async function(req, res) {
   const highestRank = await getHighestRoleName(req.user.id);
   const p = getProfile(req.user.id);
   const tab = req.query.tab || 'profile';
-
-  const tabs = `
-    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
-      <a class="btn ${tab === 'profile' ? '' : 'btn-outline'}" href="/settings?tab=profile">Profile</a>
-      <a class="btn ${tab === 'account' ? '' : 'btn-outline'}" href="/settings?tab=account">Account Info</a>
-      <a class="btn ${tab === 'appearance' ? '' : 'btn-outline'}" href="/settings?tab=appearance">Appearance</a>
-    </div>`;
-
+  const tabs = `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+    <a class="btn ${tab==='profile'?'':'btn-outline'}" href="/settings?tab=profile">Profile</a>
+    <a class="btn ${tab==='account'?'':'btn-outline'}" href="/settings?tab=account">Account Info</a>
+    <a class="btn ${tab==='appearance'?'':'btn-outline'}" href="/settings?tab=appearance">Appearance</a></div>`;
   let body = '';
   if (tab === 'profile') {
-    body = `<div class="card"><h2>Profile</h2>
-      <form method="POST" action="/settings/profile">
-        <label class="muted">Display name</label>
-        <input name="displayName" value="${p.displayName || ''}" placeholder="${req.user.username}"/>
-        <label class="muted">Tagline</label>
-        <input name="tagline" value="${p.tagline || ''}"/>
-        <label class="muted">Bio</label>
-        <textarea name="bio" rows="4">${p.bio || ''}</textarea>
-        <label class="muted">Banner image URL</label>
-        <input name="bannerUrl" value="${p.bannerUrl || ''}"/>
-        <label class="muted">Timezone</label>
-        <input name="timezone" value="${p.timezone || 'America/Chicago'}"/>
-        <button class="btn" type="submit">Save Profile</button>
-      </form></div>`;
+    body = `<div class="card"><h2>Profile</h2><form method="POST" action="/settings/profile">
+      <input name="displayName" value="${p.displayName||''}" placeholder="Display name"/>
+      <input name="tagline" value="${p.tagline||''}" placeholder="Tagline"/>
+      <textarea name="bio" rows="4" placeholder="Bio">${p.bio||''}</textarea>
+      <input name="bannerUrl" value="${p.bannerUrl||''}" placeholder="Banner URL"/>
+      <input name="timezone" value="${p.timezone||'America/Chicago'}" placeholder="Timezone"/>
+      <button class="btn" type="submit">Save Profile</button></form></div>`;
   } else if (tab === 'account') {
     body = `<div class="card"><h2>Account Info</h2>
       <p><strong>Discord ID:</strong> ${req.user.id}</p>
-      <p><strong>Discord Username:</strong> ${req.user.username}</p>
+      <p><strong>Username:</strong> ${req.user.username}</p>
       <p><strong>Highest Rank:</strong> ${highestRank}</p>
-      <form method="POST" action="/settings/sync-roles" style="margin-top:14px">
-        <button class="btn" type="submit">Sync Roles from Discord</button>
-      </form></div>`;
+      <form method="POST" action="/settings/sync-roles" style="margin-top:14px"><button class="btn" type="submit">Sync Roles from Discord</button></form></div>`;
   } else {
-    body = `<div class="card"><h2>Appearance</h2>
-      <form method="POST" action="/settings/appearance">
-        <label class="muted">Accent color</label>
-        <input name="accent" value="${p.accent || '#0ea5e9'}"/>
-        <label><input type="checkbox" name="compactMode" ${p.compactMode ? 'checked' : ''}/> Compact mode</label><br/><br/>
-        <label><input type="checkbox" name="collapseSidebar" ${p.collapseSidebar ? 'checked' : ''}/> Collapse sidebar by default</label><br/><br/>
-        <button class="btn" type="submit">Save Changes</button>
-      </form></div>`;
+    body = `<div class="card"><h2>Appearance</h2><form method="POST" action="/settings/appearance">
+      <input name="accent" value="${p.accent||'#0ea5e9'}" placeholder="#0ea5e9"/>
+      <label><input type="checkbox" name="compactMode" ${p.compactMode?'checked':''}/> Compact mode</label><br/><br/>
+      <label><input type="checkbox" name="collapseSidebar" ${p.collapseSidebar?'checked':''}/> Collapse sidebar by default</label><br/><br/>
+      <button class="btn" type="submit">Save Changes</button></form></div>`;
   }
-
-  res.send(layout(req.user, 'Settings', `
-    <div class="card"><h2>Settings</h2><p class="muted">Manage your profile and preferences.</p></div>
-    ${tabs}${body}
-  `, highestRank));
+  res.send(layout(req.user, 'Settings', `<div class="card"><h2>Settings</h2><p class="muted">Profile, preferences, security.</p></div>${tabs}${body}`, highestRank));
 });
-
 app.post('/settings/profile', checkAccess, function(req, res) {
-  saveProfile(req.user.id, {
-    displayName: req.body.displayName || '',
-    tagline: req.body.tagline || '',
-    bio: req.body.bio || '',
-    bannerUrl: req.body.bannerUrl || '',
-    timezone: req.body.timezone || 'America/Chicago'
-  });
+  saveProfile(req.user.id, { displayName: req.body.displayName||'', tagline: req.body.tagline||'', bio: req.body.bio||'', bannerUrl: req.body.bannerUrl||'', timezone: req.body.timezone||'America/Chicago' });
   addAudit({ type: 'settings_profile', actorId: req.user.id, actor: req.user.username, detail: 'Updated profile' });
   res.redirect('/settings?tab=profile');
 });
-
 app.post('/settings/appearance', checkAccess, function(req, res) {
-  saveProfile(req.user.id, {
-    accent: req.body.accent || '#0ea5e9',
-    compactMode: !!req.body.compactMode,
-    collapseSidebar: !!req.body.collapseSidebar
-  });
+  saveProfile(req.user.id, { accent: req.body.accent||'#0ea5e9', compactMode: !!req.body.compactMode, collapseSidebar: !!req.body.collapseSidebar });
   addAudit({ type: 'settings_appearance', actorId: req.user.id, actor: req.user.username, detail: 'Updated appearance' });
   res.redirect('/settings?tab=appearance');
 });
-
 app.post('/settings/sync-roles', checkAccess, function(req, res) {
-  addAudit({ type: 'roles_sync', actorId: req.user.id, actor: req.user.username, detail: 'Synced roles from Discord' });
+  addAudit({ type: 'roles_sync', actorId: req.user.id, actor: req.user.username, detail: 'Synced roles' });
   res.redirect('/settings?tab=account');
 });
 
