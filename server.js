@@ -29,7 +29,7 @@ for (const key of Object.keys(files)) {
 function read(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function save(file, data) { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
 
-async function sendDiscordLog(title, description, color = 0x0ea5e9) {
+async function sendDiscordLog(title, description, color = 0x38bdf8) {
   const channelId = process.env.AUDIT_LOG_CHANNEL_ID;
   if (!channelId || !process.env.BOT_TOKEN) return;
   try {
@@ -59,10 +59,7 @@ function addAudit(entry) {
   const row = { id: Date.now().toString(), ...entry, at: new Date().toISOString() };
   logs.push(row);
   save(files.audit, logs.slice(-3000));
-  sendDiscordLog(
-    entry.type || 'Audit',
-    `**Actor:** ${entry.actor || 'System'}\n**Detail:** ${entry.detail || '—'}`
-  );
+  sendDiscordLog(entry.type || 'Audit', `**Actor:** ${entry.actor || 'System'}\n**Detail:** ${entry.detail || '—'}`);
 }
 
 function defaultNotifications() {
@@ -175,7 +172,6 @@ async function dmUser(userId, embed) {
     return false;
   }
 }
-
 async function postLoaReviewMessage(loa) {
   const channelId = process.env.LOA_REVIEW_CHANNEL_ID;
   if (!channelId || !process.env.BOT_TOKEN) return;
@@ -189,7 +185,7 @@ async function postLoaReviewMessage(loa) {
       body: JSON.stringify({
         embeds: [{
           title: 'Leave of Absence Request',
-          color: 0x0ea5e9,
+          color: 0x38bdf8,
           fields: [
             { name: 'Staff', value: `${loa.username}\n\`${loa.userId}\``, inline: true },
             { name: 'Available for basics?', value: loa.availableBasics ? 'Yes' : 'No', inline: true },
@@ -212,7 +208,6 @@ async function postLoaReviewMessage(loa) {
     console.error('LOA review post failed', e);
   }
 }
-
 async function checkAccess(req, res, next) {
   if (!req.isAuthenticated()) return res.redirect('/login');
   const memberRoles = await getMemberRoles(req.user.id);
@@ -222,7 +217,7 @@ async function checkAccess(req, res, next) {
   const hasWeb = webRole && memberRoles.includes(webRole.id);
   const hasBot = botRole && memberRoles.includes(botRole.id);
   if (!hasWeb && !hasBot) {
-    return res.send(`<!DOCTYPE html><html><body style="background:#050814;color:#fff;font-family:system-ui;display:flex;height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Access Denied</h1><p>You need <b>${config.roles.webAccess}</b></p><a href="/logout" style="color:#0ea5e9">Logout</a></div></body></html>`);
+    return res.send(`<!DOCTYPE html><html><body style="background:#070b14;color:#fff;font-family:system-ui;display:flex;height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Access Denied</h1><p>You need <b>${config.roles.webAccess}</b></p><a href="/logout" style="color:#38bdf8">Logout</a></div></body></html>`);
   }
   req.user.hasBotManagement = !!hasBot;
   next();
@@ -242,135 +237,336 @@ function layout(user, title, content, highestRank) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>${title} • ${config.siteName}</title>
 <link rel="icon" href="${config.favicon || config.logo}"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:${config.colors.background};--card:${config.colors.card};--primary:${config.colors.primary};--accent:${config.colors.accent};--text:${config.colors.text};--muted:${config.colors.muted};--border:rgba(255,255,255,.08);--shadow:0 18px 50px rgba(0,0,0,.35)}
-body.light{--bg:#f4f7fc;--card:#fff;--text:#0b1220;--muted:#64748b;--border:#e6ebf3;--shadow:0 12px 30px rgba(15,23,42,.08)}
+:root{
+  --bg:${config.colors.background};
+  --card:${config.colors.card};
+  --primary:${config.colors.primary};
+  --accent:${config.colors.accent};
+  --text:${config.colors.text};
+  --muted:${config.colors.muted};
+  --border:rgba(148,163,184,.14);
+  --shadow:0 20px 50px rgba(0,0,0,.35);
+  --glow:0 0 0 1px rgba(56,189,248,.18), 0 10px 30px rgba(56,189,248,.08);
+}
+body.light{
+  --bg:#f5f7fb;--card:#ffffff;--text:#0f172a;--muted:#64748b;
+  --border:#e2e8f0;--shadow:0 12px 30px rgba(15,23,42,.08);--glow:0 0 0 1px rgba(14,165,233,.12);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(900px 500px at 10% -10%,rgba(14,165,233,.18),transparent 55%),radial-gradient(700px 400px at 100% 0%,rgba(179,8,56,.12),transparent 50%),var(--bg);color:var(--text);min-height:100vh}
+html{scroll-behavior:smooth}
+body{
+  font-family:Inter,system-ui,sans-serif;
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(56,189,248,.16), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(251,113,133,.10), transparent 50%),
+    var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  line-height:1.5;
+}
 body.compact .card{padding:14px}
-.sidebar{width:300px;height:100vh;position:fixed;background:rgba(12,19,34,.96);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;overflow-y:auto}
+body.compact .main{padding:18px 18px 40px}
+
+.sidebar{
+  width:300px;height:100vh;position:fixed;left:0;top:0;
+  background:rgba(10,16,28,.88);
+  border-right:1px solid var(--border);
+  backdrop-filter:blur(18px);
+  padding:18px 12px;
+  display:flex;flex-direction:column;
+  z-index:40;
+  transition:width .28s ease, transform .28s ease;
+}
+body.light .sidebar{background:rgba(255,255,255,.92)}
 body.collapse-side .sidebar{width:92px}
-body.collapse-side .logo-text,body.collapse-side .nav-label{display:none}
-body.collapse-side .nav a{justify-content:center;padding:12px}
-body.collapse-side .nav a span{position:absolute;left:-9999px}
+body.collapse-side .logo-text,
+body.collapse-side .nav-label,
+body.collapse-side .nav a span.label{display:none}
+body.collapse-side .nav a{justify-content:center}
 body.collapse-side .main{margin-left:92px}
-.logo{display:flex;gap:12px;align-items:center;padding:8px;margin-bottom:12px}
-.logo img{width:44px;height:44px;border-radius:12px}
-.logo-text{font-weight:900;font-size:14px;line-height:1.15}
-.logo-text span{display:block;color:var(--muted);font-size:11px;font-weight:600}
-.nav-label{font-family:Georgia,serif;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#c7d2e5;padding:16px 12px 8px}
-.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;color:var(--muted);text-decoration:none;margin-bottom:4px;font-size:14px;font-weight:800;position:relative}
-.nav a:hover,.nav a.active{background:rgba(14,165,233,.14);color:var(--primary)}
-body.collapse-side .nav a:hover span{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:#0c1322;border:1px solid var(--border);padding:8px 10px;border-radius:8px;white-space:nowrap;z-index:20;color:var(--text)}
-.main{margin-left:300px;padding:28px 34px 50px}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
-.hero{background:linear-gradient(135deg,rgba(14,165,233,.18),rgba(179,8,56,.10));border:1px solid var(--border);border-radius:22px;padding:22px 24px;margin-bottom:18px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:16px}
-h1{font-size:30px}h2{font-size:18px;margin-bottom:10px}.muted{color:var(--muted);font-size:14px}
-.btn{background:var(--primary);color:#fff;border:none;padding:11px 16px;border-radius:12px;cursor:pointer;font-weight:800;text-decoration:none;display:inline-block;font-size:14px}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-accent{background:var(--accent)}.btn-row{display:flex;flex-wrap:wrap;gap:10px}
-input,textarea,select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);margin:8px 0 12px}
+
+.logo{display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:10px}
+.logo img{width:44px;height:44px;border-radius:14px;object-fit:cover;box-shadow:var(--shadow)}
+.logo-text{font-weight:900;font-size:14px;letter-spacing:-.02em}
+.logo-text span{display:block;color:var(--muted);font-size:11px;font-weight:600;margin-top:2px}
+
+.nav-label{
+  font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;
+  color:#cbd5e1;padding:16px 12px 8px;opacity:.9
+}
+.nav a{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 12px;border-radius:14px;color:var(--muted);
+  text-decoration:none;margin-bottom:4px;font-size:14px;font-weight:700;
+  transition:all .2s ease; position:relative;
+}
+.nav a:hover{background:rgba(56,189,248,.10);color:var(--primary);transform:translateX(3px)}
+.nav a.active{background:rgba(56,189,248,.14);color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+.nav a .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.55}
+
+.main{margin-left:300px;padding:28px 34px 60px;transition:margin-left .28s ease}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+.page-title h1{font-size:clamp(24px,3vw,34px);font-weight:900;letter-spacing:-.04em}
+.page-title p{color:var(--muted);font-size:14px;margin-top:4px}
+
+.profile{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--border);
+  border-radius:999px;padding:7px 14px 7px 7px;
+  box-shadow:var(--shadow);
+  transition:transform .2s ease, border-color .2s ease;
+}
+.profile:hover{transform:translateY(-1px);border-color:rgba(56,189,248,.28)}
+.profile img{width:36px;height:36px;border-radius:50%}
+
+.hero,.card,.stat-card,.action-card{
+  animation:rise .45s ease both;
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
+.hero{
+  background:linear-gradient(135deg, rgba(56,189,248,.16), rgba(251,113,133,.08));
+  border:1px solid var(--border);
+  border-radius:24px;padding:24px;
+  margin-bottom:18px;box-shadow:var(--shadow);
+  position:relative;overflow:hidden;
+}
+.hero:before{
+  content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;
+  background:radial-gradient(circle,rgba(56,189,248,.25),transparent 70%);
+  pointer-events:none;
+}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+  border:1px solid var(--border);
+  border-radius:20px;padding:20px;margin-bottom:16px;
+  box-shadow:var(--shadow);
+  transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.card:hover{transform:translateY(-2px);border-color:rgba(56,189,248,.22);box-shadow:var(--glow)}
+h2{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:10px}
+.muted{color:var(--muted);font-size:14px}
+
+.btn{
+  background:linear-gradient(135deg, var(--primary), #0ea5e9);
+  color:#041018;border:none;padding:11px 16px;border-radius:12px;
+  cursor:pointer;font-weight:800;text-decoration:none;display:inline-flex;
+  align-items:center;justify-content:center;gap:8px;font-size:14px;
+  transition:transform .18s ease, filter .18s ease, box-shadow .18s ease;
+  box-shadow:0 8px 20px rgba(56,189,248,.18);
+}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.btn:active{transform:translateY(0)}
+.btn-outline{
+  background:transparent;color:var(--text);border:1px solid var(--border);
+  box-shadow:none;
+}
+.btn-outline:hover{border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.08)}
+.btn-accent{background:linear-gradient(135deg, var(--accent), #e11d48);color:#fff;box-shadow:0 8px 20px rgba(251,113,133,.18)}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px}
+
+input,textarea,select{
+  width:100%;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.03);
+  color:var(--text);margin:8px 0 12px;font-size:14px;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+input:focus,textarea:focus,select:focus{
+  outline:none;border-color:rgba(56,189,248,.45);
+  box-shadow:0 0 0 4px rgba(56,189,248,.12);
+}
+body.light input,body.light textarea,body.light select{background:#fff}
+
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.stat{font-size:28px;font-weight:900}
-.badge{display:inline-block;background:rgba(14,165,233,.15);color:var(--primary);font-size:11px;padding:4px 9px;border-radius:999px;font-weight:800;margin:2px}
-.badge-green{background:rgba(34,197,94,.15);color:#4ade80}
-.badge-red{background:rgba(239,68,68,.15);color:#f87171}
-.badge-yellow{background:rgba(234,179,8,.15);color:#facc15}
-.msg{padding:12px 14px;border-radius:14px;margin-bottom:10px;border:1px solid var(--border)}
+.stat{font-size:30px;font-weight:900;letter-spacing:-.04em}
+.stat-card{text-align:left}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(56,189,248,.12);color:var(--primary);
+  font-size:11px;padding:5px 10px;border-radius:999px;font-weight:800;margin:2px;
+}
+.badge-green{background:rgba(34,197,94,.12);color:#4ade80}
+.badge-red{background:rgba(239,68,68,.12);color:#f87171}
+.badge-yellow{background:rgba(234,179,8,.12);color:#facc15}
+
+.msg{
+  padding:14px 16px;border-radius:16px;margin-bottom:12px;
+  border:1px solid var(--border);
+  animation:rise .35s ease both;
+}
 .msg.user{background:rgba(34,197,94,.08);border-left:3px solid #22c55e}
-.msg.staff{background:rgba(14,165,233,.08);border-left:3px solid var(--primary)}
+.msg.staff{background:rgba(56,189,248,.08);border-left:3px solid var(--primary)}
 .msg.internal{background:rgba(234,179,8,.08);border-left:3px solid #eab308}
-.switch-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
+
+.switch-row{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 0;border-bottom:1px solid var(--border);
+}
 .switch{position:relative;width:52px;height:30px;flex-shrink:0}
 .switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;inset:0;background:#334155;border-radius:999px;transition:.2s}
-.slider:before{position:absolute;content:"";height:22px;width:22px;left:4px;top:4px;background:white;border-radius:50%;transition:.2s}
+.slider{position:absolute;cursor:pointer;inset:0;background:#334155;border-radius:999px;transition:.22s}
+.slider:before{position:absolute;content:"";height:22px;width:22px;left:4px;top:4px;background:#fff;border-radius:50%;transition:.22s;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .switch input:checked + .slider{background:var(--primary)}
 .switch input:checked + .slider:before{transform:translateX(22px)}
-.profile{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:8px 14px 8px 8px}
-.profile img{width:36px;height:36px;border-radius:50%}
+
 .ticket-shell{display:grid;grid-template-columns:1.7fr .9fr;gap:16px}
-.chat-box{max-height:520px;overflow-y:auto;padding-right:6px}
+.chat-box{max-height:520px;overflow-y:auto;padding-right:4px}
 .role-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-@media(max-width:980px){.sidebar{display:none}.main{margin-left:0}.grid,.grid-4,.ticket-shell{grid-template-columns:1fr}}
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.action-card{
+  display:block;padding:16px;border-radius:16px;border:1px solid var(--border);
+  background:rgba(255,255,255,.03);text-decoration:none;color:var(--text);font-weight:800;
+  transition:transform .2s ease, border-color .2s ease, background .2s ease;
+}
+.action-card:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.06)}
+.action-card span{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-top:6px}
+
+.mobile-top{display:none}
+@media(max-width:980px){
+  .sidebar{transform:translateX(-105%)}
+  .sidebar.open{transform:none}
+  .main{margin-left:0;padding:18px 16px 50px}
+  .grid,.grid-4,.ticket-shell,.action-grid{grid-template-columns:1fr}
+  .mobile-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+}
+
+/* loading shimmer */
+.shimmer{
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.06), transparent);
+  background-size:200% 100%;
+  animation:shimmer 1.4s infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body class="${compactClass} ${collapseClass}">
-<div class="sidebar">
-  <div class="logo"><img src="${config.logo}" alt=""/><div class="logo-text">${config.siteName}<span>${config.siteSubtitle}</span></div></div>
+<div class="sidebar" id="sidebar">
+  <div class="logo">
+    <img src="${config.logo}" alt="Logo"/>
+    <div class="logo-text">${config.siteName}<span>${config.siteSubtitle}</span></div>
+  </div>
   <div class="nav">
     <div class="nav-label">Overview</div>
-    <a href="/dashboard" class="${title==='Dashboard'?'active':''}" title="Dashboard"><span>Dashboard</span></a>
+    <a href="/dashboard" class="${title==='Dashboard'?'active':''}" title="Dashboard"><span class="dot"></span><span class="label">Dashboard</span></a>
+
     <div class="nav-label">Community</div>
-    <a href="/support" class="${title==='Support'?'active':''}" title="Support"><span>Support</span></a>
-    <a href="/announcements" class="${title==='Announcements'?'active':''}" title="Announcements"><span>Announcements</span></a>
-    <a href="/notifications" class="${title==='Notifications'?'active':''}" title="Notifications"><span>Notifications</span></a>
+    <a href="/support" class="${title==='Support'?'active':''}" title="Support"><span class="dot"></span><span class="label">Support</span></a>
+    <a href="/announcements" class="${title==='Announcements'?'active':''}" title="Announcements"><span class="dot"></span><span class="label">Announcements</span></a>
+    <a href="/notifications" class="${title==='Notifications'?'active':''}" title="Notifications"><span class="dot"></span><span class="label">Notifications</span></a>
+
     <div class="nav-label">Management</div>
-    <a href="/loa" class="${title==='LOA'?'active':''}" title="Leave of Absence"><span>Leave of Absence</span></a>
-    <a href="/settings" class="${title==='Settings'?'active':''}" title="Settings"><span>Settings</span></a>
+    <a href="/loa" class="${title==='LOA'?'active':''}" title="Leave of Absence"><span class="dot"></span><span class="label">Leave of Absence</span></a>
+    <a href="/settings" class="${title==='Settings'?'active':''}" title="Settings"><span class="dot"></span><span class="label">Settings</span></a>
+
     ${isManager ? `
       <div class="nav-label">Administration</div>
-      <a href="/admin/announcements" class="${title==='Admin Announcements'?'active':''}" title="Post Announcements"><span>Post Announcements</span></a>
-      <a href="/logs" class="${title==='Logs'?'active':''}" title="Audit Logs"><span>Audit Logs</span></a>
+      <a href="/admin/announcements" class="${title==='Admin Announcements'?'active':''}" title="Post Announcements"><span class="dot"></span><span class="label">Post Announcements</span></a>
+      <a href="/logs" class="${title==='Logs'?'active':''}" title="Audit Logs"><span class="dot"></span><span class="label">Audit Logs</span></a>
     ` : ''}
-    <a href="/logout" style="margin-top:auto;color:#f87171" title="Logout"><span>Logout</span></a>
+
+    <a href="/logout" style="margin-top:auto;color:#fb7185" title="Logout"><span class="dot"></span><span class="label">Logout</span></a>
   </div>
 </div>
+
 <div class="main">
+  <div class="mobile-top">
+    <button class="btn btn-outline" type="button" onclick="document.getElementById('sidebar').classList.toggle('open')">Menu</button>
+    <button class="btn btn-outline" type="button" onclick="toggleTheme()">Theme</button>
+  </div>
+
   <div class="topbar">
-    <div><h1>${title}</h1><p class="muted">Lone Star College Administration</p></div>
+    <div class="page-title">
+      <h1>${title}</h1>
+      <p>Lone Star College Administration</p>
+    </div>
     <div style="display:flex;align-items:center;gap:12px">
       <button class="btn btn-outline" onclick="toggleTheme()" style="padding:8px 12px">Theme</button>
       <div class="profile">
-        <img src="${user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : 'https://via.placeholder.com/36'}"/>
-        <div style="font-size:13px"><div style="font-weight:800">${user.username}</div><div class="muted" style="font-size:11px">${highestRank}</div></div>
+        <img src="${user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : 'https://via.placeholder.com/36'}" alt=""/>
+        <div style="font-size:13px;line-height:1.2">
+          <div style="font-weight:800">${user.username}</div>
+          <div class="muted" style="font-size:11px">${highestRank}</div>
+        </div>
       </div>
     </div>
   </div>
   ${content}
 </div>
+
 <script>
-function toggleTheme(){document.body.classList.toggle('light');localStorage.setItem('theme',document.body.classList.contains('light')?'light':'dark')}
-if(localStorage.getItem('theme')==='light')document.body.classList.add('light');
-var idle=0;function resetIdle(){idle=0}
-setInterval(function(){idle++;if(idle>=30)location.href='/logout'},60000);
-['load','mousemove','keypress','click','scroll'].forEach(e=>window.addEventListener(e,resetIdle));
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+}
+if(localStorage.getItem('theme')==='light') document.body.classList.add('light');
+
+var idle=0;
+function resetIdle(){idle=0}
+setInterval(function(){idle++; if(idle>=30) location.href='/logout'}, 60000);
+['load','mousemove','keypress','click','scroll','touchstart'].forEach(function(e){
+  window.addEventListener(e, resetIdle, {passive:true});
+});
 </script>
 </body></html>`;
 }
 
 function legalPage(title, body) {
   return `<!DOCTYPE html><html><head><title>${title}</title><link rel="icon" href="${config.favicon || config.logo}"/>
-  <style>body{margin:0;font-family:system-ui;background:#050814;color:#eef3fb;padding:40px 18px}.wrap{max-width:720px;margin:0 auto;background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px}a{color:#0ea5e9;text-decoration:none}p{color:#b7c3d8;line-height:1.7;margin:12px 0}</style></head>
-  <body><div class="wrap"><h1>${title}</h1>${body}<p style="margin-top:24px"><a href="/login">← Back to login</a></p>
-  <p style="color:#66758f;font-size:12px">© 2026 Roblox, Lone Star College. All rights reserved.</p></div></body></html>`;
+  <style>
+  body{margin:0;font-family:Inter,system-ui;background:#070b14;color:#f1f5f9;padding:40px 18px}
+  .wrap{max-width:760px;margin:0 auto;background:#0d1524;border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:28px}
+  a{color:#38bdf8;text-decoration:none}p{color:#94a3b8;line-height:1.7;margin:12px 0}
+  </style></head>
+  <body><div class="wrap"><h1>${title}</h1>${body}
+  <p style="margin-top:24px"><a href="/login">← Back to login</a></p>
+  <p style="color:#64748b;font-size:12px">© 2026 Roblox, Lone Star College. All rights reserved.</p>
+  </div></body></html>`;
 }
 
 app.get('/', (req, res) => req.isAuthenticated() ? res.redirect('/dashboard') : res.redirect('/login'));
 
 app.get('/login', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Staff Portal • ${config.siteName}</title><link rel="icon" href="${config.favicon || config.logo}"/>
+  res.send(`<!DOCTYPE html><html><head>
+<title>Staff Portal • ${config.siteName}</title>
+<link rel="icon" href="${config.favicon || config.logo}"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
-body{margin:0;font-family:Inter,system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#eef3fb;background:radial-gradient(900px 500px at 20% -10%,rgba(14,165,233,.2),transparent 55%),#050814}
-.box{width:420px;background:rgba(12,19,34,.95);border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:42px 36px;text-align:center}
-img{width:78px;height:78px;border-radius:18px;margin-bottom:18px}
-.btn{display:inline-flex;width:100%;justify-content:center;background:#5865F2;color:#fff;text-decoration:none;padding:14px 18px;border-radius:14px;font-weight:800}
-.legal{margin-top:22px;font-size:12px;color:#8b9bb8}.legal a{color:#8b9bb8;text-decoration:none;margin:0 6px}
-.copy{margin-top:14px;font-size:11px;color:#66758f}
-</style></head><body><div class="box">
-<img src="${config.loginLogo}"/><h1>Staff Portal</h1>
-<p style="color:#8b9bb8;margin:8px 0 22px">${config.siteName}<br/>Authorized personnel only</p>
-<a class="btn" href="/auth/discord">Continue with Discord</a>
-<div class="legal"><a href="/privacy">Privacy</a>•<a href="/terms">Terms of Service</a>•<a href="/cookies">Cookies</a></div>
-<div class="copy">© 2026 Roblox, Lone Star College. All rights reserved.</div>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#f1f5f9;
+background:radial-gradient(1000px 600px at 15% -10%,rgba(56,189,248,.22),transparent 55%),radial-gradient(800px 500px at 100% 0%,rgba(251,113,133,.12),transparent 50%),#070b14}
+.box{width:min(440px,92vw);background:rgba(13,21,36,.92);border:1px solid rgba(148,163,184,.14);border-radius:28px;padding:42px 34px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45);backdrop-filter:blur(16px);animation:rise .5s ease}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+img{width:84px;height:84px;border-radius:22px;margin-bottom:18px}
+h1{font-size:30px;font-weight:900;letter-spacing:-.04em;margin-bottom:8px}
+.sub{color:#94a3b8;margin-bottom:24px}
+.btn{display:inline-flex;width:100%;justify-content:center;background:linear-gradient(135deg,#5865F2,#4752c4);color:#fff;text-decoration:none;padding:14px 18px;border-radius:14px;font-weight:800;transition:transform .18s ease}
+.btn:hover{transform:translateY(-2px)}
+.legal{margin-top:22px;font-size:12px;color:#94a3b8}
+.legal a{color:#94a3b8;text-decoration:none;margin:0 6px}
+.legal a:hover{color:#38bdf8}
+.copy{margin-top:14px;font-size:11px;color:#64748b}
+</style></head>
+<body><div class="box">
+  <img src="${config.loginLogo}" alt=""/>
+  <h1>Staff Portal</h1>
+  <p class="sub">${config.siteName}<br/>Authorized personnel only</p>
+  <a class="btn" href="/auth/discord">Continue with Discord</a>
+  <div class="legal"><a href="/privacy">Privacy</a>•<a href="/terms">Terms of Service</a>•<a href="/cookies">Cookies</a></div>
+  <div class="copy">© 2026 Roblox, Lone Star College. All rights reserved.</div>
 </div></body></html>`);
 });
 
-app.get('/privacy', (req, res) => res.send(legalPage('Privacy Policy', `<p>Staff portal authentication uses Discord identity for access control.</p><p>Operational data such as tickets, LOA, and audit events may be stored.</p>`)));
-app.get('/terms', (req, res) => res.send(legalPage('Terms of Service', `<p>Authorized staff only. Misuse of tools or confidential data is prohibited.</p>`)));
-app.get('/cookies', (req, res) => res.send(legalPage('Cookies', `<p>Session cookies keep you signed in. Local storage saves UI preferences.</p>`)));
+app.get('/privacy', (req, res) => res.send(legalPage('Privacy Policy', `<p>This Staff Portal is operated for Lone Star College administrative use.</p><p>Discord identity is used for authentication and access control.</p><p>Ticket, LOA, chat, and audit data may be stored for operations.</p>`)));
+app.get('/terms', (req, res) => res.send(legalPage('Terms of Service', `<p>Access is limited to authorized staff with required Discord roles.</p><p>Misuse of ModMail, confidential data, or system access is prohibited.</p>`)));
+app.get('/cookies', (req, res) => res.send(legalPage('Cookies', `<p>Essential session cookies keep you logged in securely.</p><p>Local storage saves theme and UI preferences only.</p>`)));
 
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/auth/discord/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
@@ -382,7 +578,7 @@ app.get('/logout', (req, res) => {
   req.logout(() => res.redirect('/login'));
 });
 
-// ModMail API
+// ===== APIs =====
 app.post('/api/modmail/ticket', (req, res) => {
   if (req.headers['x-modmail-secret'] !== process.env.MODMAIL_SECRET) return res.status(401).json({ error: 'Unauthorized' });
   const userId = String(req.body.userId || '');
@@ -407,16 +603,10 @@ app.post('/api/modmail/ticket', (req, res) => {
   }
   if (content) ticket.messages.push({ from: 'user', author: username, content, timestamp: new Date().toISOString() });
   save(files.tickets, tickets);
-  addAudit({
-    type: isNew ? 'ticket_create' : 'ticket_user_reply',
-    actorId: userId,
-    actor: username,
-    detail: isNew ? `New ticket #${ticket.id}` : `Reply on ticket #${ticket.id}`
-  });
+  addAudit({ type: isNew ? 'ticket_create' : 'ticket_user_reply', actorId: userId, actor: username, detail: isNew ? `New ticket #${ticket.id}` : `Reply on #${ticket.id}` });
   res.json({ success: true, ticket });
 });
 
-// LOA decision API for bot buttons
 app.post('/api/loa/:id/decision', async (req, res) => {
   if (req.headers['x-modmail-secret'] !== process.env.MODMAIL_SECRET) return res.status(401).json({ error: 'Unauthorized' });
   const loas = read(files.loa);
@@ -424,7 +614,7 @@ app.post('/api/loa/:id/decision', async (req, res) => {
   if (!loa) return res.status(404).json({ error: 'Not found' });
   if (loa.status !== 'pending') return res.json({ success: false, error: 'Already decided' });
 
-  const decision = req.body.decision; // approved | denied
+  const decision = req.body.decision;
   const reviewer = req.body.reviewer || 'Staff';
   const reviewerId = req.body.reviewerId || '';
   const note = req.body.note || '';
@@ -465,6 +655,7 @@ app.post('/api/loa/:id/decision', async (req, res) => {
   res.json({ success: true, loa });
 });
 
+// ===== PAGES =====
 app.get('/dashboard', checkAccess, async (req, res) => {
   const announcements = read(files.announcements);
   const latest = announcements[announcements.length - 1];
@@ -477,29 +668,39 @@ app.get('/dashboard', checkAccess, async (req, res) => {
   const latestHTML = latest ? `<p><strong>${latest.title}</strong></p><p class="muted">${latest.content}</p>` : '<p class="muted">No announcements yet.</p>';
 
   res.send(layout(req.user, 'Dashboard', `
-    <div class="hero"><h2>Operations Center</h2><p class="muted">Welcome back, <strong>${req.user.username}</strong> · ${highestRank}</p></div>
+    <div class="hero">
+      <h2>Operations Center</h2>
+      <p class="muted">Welcome back, <strong>${req.user.username}</strong> · ${highestRank}</p>
+      <div class="btn-row" style="margin-top:14px">
+        <a class="btn" href="/support">Open Support</a>
+        <a class="btn btn-outline" href="/loa">Request LOA</a>
+        <a class="btn btn-outline" href="/settings">Settings</a>
+      </div>
+    </div>
     <div class="grid-4">
-      <div class="card"><div class="stat">${openTickets}</div><p class="muted">Open Tickets</p></div>
-      <div class="card"><div class="stat">${tickets.length}</div><p class="muted">Total Tickets</p></div>
-      <div class="card"><div class="stat">${read(files.loa).filter(l => l.status === 'pending').length}</div><p class="muted">LOA Pending</p></div>
-      <div class="card"><div class="stat">${announcements.length}</div><p class="muted">Announcements</p></div>
+      <div class="card stat-card"><div class="stat">${openTickets}</div><p class="muted">Open Tickets</p></div>
+      <div class="card stat-card"><div class="stat">${tickets.length}</div><p class="muted">Total Tickets</p></div>
+      <div class="card stat-card"><div class="stat">${read(files.loa).filter(l => l.status === 'pending').length}</div><p class="muted">LOA Pending</p></div>
+      <div class="card stat-card"><div class="stat">${announcements.length}</div><p class="muted">Announcements</p></div>
     </div>
     <div class="grid">
       <div class="card"><h2>Latest Announcement</h2>${latestHTML}</div>
       <div class="card"><h2>Question of the Day</h2><p style="margin-bottom:12px">${qotd}</p>
-        <form method="POST" action="/chat/post"><input type="hidden" name="type" value="qotd"/><textarea name="content" required rows="3"></textarea><button class="btn" type="submit">Post Answer</button></form>
+        <form method="POST" action="/chat/post"><input type="hidden" name="type" value="qotd"/><textarea name="content" required rows="3" placeholder="Share your answer..."></textarea><button class="btn" type="submit">Post Answer</button></form>
       </div>
     </div>
     <div class="card"><h2>Staff Chat</h2>
       <div style="max-height:320px;overflow-y:auto;margin-bottom:12px">${chatHTML}</div>
-      <form method="POST" action="/chat/post"><input type="hidden" name="type" value="chat"/><textarea name="content" required rows="2"></textarea><button class="btn" type="submit">Send</button></form>
+      <form method="POST" action="/chat/post"><input type="hidden" name="type" value="chat"/><textarea name="content" required rows="2" placeholder="Write a message..."></textarea><button class="btn" type="submit">Send Message</button></form>
     </div>
     <div class="card"><h2>Quick Actions</h2>
-      <div class="btn-row">
-        <a class="btn" href="/support">Support Queue</a>
-        <a class="btn btn-outline" href="/loa">Leave of Absence</a>
-        <a class="btn btn-outline" href="/announcements">Announcements</a>
-        <a class="btn btn-outline" href="/settings">Settings</a>
+      <div class="action-grid">
+        <a class="action-card" href="/support">Support Queue<span>Claim & reply to tickets</span></a>
+        <a class="action-card" href="/loa">Leave of Absence<span>Request or track leave</span></a>
+        <a class="action-card" href="/announcements">Announcements<span>Read staff updates</span></a>
+        <a class="action-card" href="/notifications">Notifications<span>Recent portal alerts</span></a>
+        <a class="action-card" href="/settings">Settings<span>Profile & preferences</span></a>
+        <a class="action-card" href="/support/macros">Macros<span>Reply templates</span></a>
       </div>
     </div>
   `, highestRank));
@@ -516,7 +717,6 @@ app.post('/chat/post', checkAccess, (req, res) => {
   res.redirect('/dashboard');
 });
 
-// SUPPORT
 app.get('/support', checkAccess, async (req, res) => {
   const highestRank = await getHighestRoleName(req.user.id);
   const tickets = read(files.tickets);
@@ -528,6 +728,7 @@ app.get('/support', checkAccess, async (req, res) => {
   let filtered = tickets.slice().reverse();
   if (status !== 'all') filtered = filtered.filter(t => t.status === status);
   if (q) filtered = filtered.filter(t => String(t.username || '').toLowerCase().includes(q) || String(t.userId || '').includes(q));
+
   const cards = filtered.map(t => {
     const last = t.messages?.[t.messages.length - 1];
     return `<a class="card" href="/support/ticket/${t.id}" style="display:block;text-decoration:none;color:inherit">
@@ -545,7 +746,9 @@ app.get('/support', checkAccess, async (req, res) => {
   }).join('') || '<p class="muted">No tickets found.</p>';
 
   res.send(layout(req.user, 'Support', `
-    <div class="hero"><h2>Support Queue</h2><p class="muted">Live ModMail conversations with members.</p>
+    <div class="hero">
+      <h2>Support Queue</h2>
+      <p class="muted">Live ModMail conversations with members.</p>
       <div class="btn-row" style="margin-top:12px"><a class="btn btn-outline" href="/support/macros">Macros</a></div>
     </div>
     <div class="grid-4">
@@ -554,17 +757,21 @@ app.get('/support', checkAccess, async (req, res) => {
       <div class="card"><div class="stat">${closed.length}</div><p class="muted">Closed</p></div>
       <div class="card"><div class="stat">${tickets.length}</div><p class="muted">Total</p></div>
     </div>
-    <div class="card"><form method="GET" action="/support" style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">
-      <div><label class="muted">Search</label><input name="q" value="${req.query.q || ''}" placeholder="Username or Discord ID"/></div>
-      <div><label class="muted">Status</label><select name="status">
-        <option value="all">All</option>
-        <option value="pending_staff">Pending Staff</option>
-        <option value="pending_user">Pending User</option>
-        <option value="claimed">Claimed</option>
-        <option value="closed">Closed</option>
-      </select></div>
-      <button class="btn" type="submit">Filter</button>
-    </form></div>
+    <div class="card">
+      <form method="GET" action="/support" style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">
+        <div><label class="muted">Search</label><input name="q" value="${req.query.q || ''}" placeholder="Username or Discord ID"/></div>
+        <div><label class="muted">Status</label>
+          <select name="status">
+            <option value="all">All</option>
+            <option value="pending_staff">Pending Staff</option>
+            <option value="pending_user">Pending User</option>
+            <option value="claimed">Claimed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+        <button class="btn" type="submit">Filter</button>
+      </form>
+    </div>
     ${cards}
   `, highestRank));
 });
@@ -597,7 +804,7 @@ app.get('/support/ticket/:id', checkAccess, async (req, res) => {
   res.send(layout(req.user, 'Support', `
     <div class="ticket-shell">
       <div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <div>
             <h2 style="margin:0">${ticket.username}</h2>
             <p class="muted">Ticket #${ticket.id} · ${ticket.status} · ${ticket.priority || 'normal'}</p>
@@ -660,29 +867,20 @@ app.get('/support/ticket/:id', checkAccess, async (req, res) => {
       </div>
     </div>
     <script>
-      // auto refresh conversation every 5s
       setInterval(function(){
-        fetch(location.href, { headers: { 'X-Requested-With': 'fetch' }})
-          .then(r => r.text())
-          .then(html => {
-            var doc = new DOMParser().parseFromString(html, 'text/html');
-            var next = doc.getElementById('chatBox');
-            var cur = document.getElementById('chatBox');
-            if (next && cur && next.innerHTML !== cur.innerHTML) {
-              var nearBottom = cur.scrollHeight - cur.scrollTop - cur.clientHeight < 80;
-              cur.innerHTML = next.innerHTML;
-              if (nearBottom) cur.scrollTop = cur.scrollHeight;
-            }
-          }).catch(()=>{});
-      }, 5000);
+        fetch(location.href).then(r=>r.text()).then(html=>{
+          var doc=new DOMParser().parseFromString(html,'text/html');
+          var next=doc.getElementById('chatBox');
+          var cur=document.getElementById('chatBox');
+          if(next&&cur&&next.innerHTML!==cur.innerHTML){
+            var nearBottom=cur.scrollHeight-cur.scrollTop-cur.clientHeight<80;
+            cur.innerHTML=next.innerHTML;
+            if(nearBottom) cur.scrollTop=cur.scrollHeight;
+          }
+        }).catch(()=>{});
+      },5000);
     </script>
   `, highestRank));
-});
-
-app.get('/api/support/ticket/:id/messages', checkAccess, (req, res) => {
-  const ticket = read(files.tickets).find(t => t.id === req.params.id);
-  if (!ticket) return res.status(404).json({ error: 'missing' });
-  res.json({ messages: ticket.messages || [], status: ticket.status });
 });
 
 app.post('/support/ticket/:id/claim', checkAccess, async (req, res) => {
@@ -743,7 +941,7 @@ app.get('/support/macros', checkAccess, async (req, res) => {
   const list = macros.map(m => `<div class="card"><strong>${m.title}</strong> <span class="badge">${m.active?'Active':'Inactive'}</span><p class="muted">${m.content}</p>
     <form method="POST" action="/support/macros/${m.id}/toggle" style="display:inline"><button class="btn btn-outline" type="submit">Toggle</button></form>
     <form method="POST" action="/support/macros/${m.id}/delete" style="display:inline;margin-left:8px"><button class="btn btn-outline" type="submit">Delete</button></form></div>`).join('') || '<p class="muted">No macros</p>';
-  res.send(layout(req.user, 'Support', `<div class="card"><h2>Create Macro</h2><form method="POST" action="/support/macros/create"><input name="title" required/><textarea name="content" required rows="4"></textarea><button class="btn" type="submit">Save</button></form></div>${list}`, highestRank));
+  res.send(layout(req.user, 'Support', `<div class="card"><h2>Create Macro</h2><form method="POST" action="/support/macros/create"><input name="title" required placeholder="Title"/><textarea name="content" required rows="4" placeholder="Hello {{username}}..."></textarea><button class="btn" type="submit">Save</button></form></div>${list}`, highestRank));
 });
 app.post('/support/macros/create', checkAccess, (req, res) => {
   const macros = read(files.macros);
@@ -763,7 +961,6 @@ app.post('/support/macros/:id/delete', checkAccess, (req, res) => {
   res.redirect('/support/macros');
 });
 
-// LOA
 function isAwayToday(loa) {
   if (loa.status !== 'approved') return false;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -779,25 +976,18 @@ app.get('/loa', checkAccess, async (req, res) => {
   const awayToday = loas.filter(isAwayToday).length;
   const approved = loas.filter(l => l.status === 'approved').length;
   const denied = loas.filter(l => l.status === 'denied').length;
-
   const status = req.query.status || 'all';
   const q = String(req.query.q || '').toLowerCase();
   let filtered = loas.slice().reverse();
   if (status !== 'all') filtered = filtered.filter(l => l.status === status);
   if (q) filtered = filtered.filter(l => String(l.username||'').toLowerCase().includes(q) || String(l.reason||'').toLowerCase().includes(q));
-
   const list = filtered.map(l => {
     const badge = l.status === 'approved' ? 'badge-green' : l.status === 'denied' ? 'badge-red' : 'badge-yellow';
-    return `<div class="card">
-      <div style="display:flex;justify-content:space-between;gap:12px">
-        <div>
-          <strong>${l.username}</strong> <span class="badge ${badge}">${l.status}</span>
-          <p class="muted" style="margin-top:8px">${l.reason}</p>
-          <small class="muted">${l.start} → ${l.end} · Basics: ${l.availableBasics ? 'Yes' : 'No'}</small>
-          ${l.denyReason ? `<p class="muted">Denied: ${l.denyReason}</p>` : ''}
-          ${l.reviewNote ? `<p class="muted">Note: ${l.reviewNote}</p>` : ''}
-        </div>
-      </div>
+    return `<div class="card"><strong>${l.username}</strong> <span class="badge ${badge}">${l.status}</span>
+      <p class="muted" style="margin-top:8px">${l.reason}</p>
+      <small class="muted">${l.start} → ${l.end} · Basics: ${l.availableBasics ? 'Yes' : 'No'}</small>
+      ${l.denyReason ? `<p class="muted">Denied: ${l.denyReason}</p>` : ''}
+      ${l.reviewNote ? `<p class="muted">Note: ${l.reviewNote}</p>` : ''}
     </div>`;
   }).join('') || '<p class="muted">No leave requests found.</p>';
 
@@ -818,7 +1008,7 @@ app.get('/loa', checkAccess, async (req, res) => {
       <h2>Request Leave</h2>
       <form method="POST" action="/loa/request">
         <label class="muted">Reason</label>
-        <textarea name="reason" required rows="3" placeholder="Why are you requesting leave?"></textarea>
+        <textarea name="reason" required rows="3"></textarea>
         <div class="grid">
           <div><label class="muted">First day away</label><input type="date" name="start" required/></div>
           <div><label class="muted">Day back</label><input type="date" name="end" required/></div>
@@ -830,9 +1020,9 @@ app.get('/loa', checkAccess, async (req, res) => {
         <button class="btn" type="submit">Submit Leave Request</button>
       </form>
     </div>
-    <div class="card"><h2>Leave Requests</h2>
+    <div class="card">
       <form method="GET" action="/loa" style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">
-        <div><label class="muted">Search staff / reason</label><input name="q" value="${req.query.q || ''}"/></div>
+        <div><label class="muted">Search</label><input name="q" value="${req.query.q || ''}"/></div>
         <div><label class="muted">Status</label>
           <select name="status">
             <option value="all">All</option>
@@ -847,7 +1037,6 @@ app.get('/loa', checkAccess, async (req, res) => {
     ${list}
   `, highestRank));
 });
-
 app.post('/loa/request', checkAccess, async (req, res) => {
   const loas = read(files.loa);
   const loa = {
@@ -874,14 +1063,12 @@ app.get('/announcements', checkAccess, async (req, res) => {
   const list = read(files.announcements).reverse().map(a => `<div class="card"><strong>${a.title}</strong><p class="muted">${a.content}</p><small class="muted">By ${a.author}</small></div>`).join('') || '<p class="muted">No announcements</p>';
   res.send(layout(req.user, 'Announcements', `<div class="hero"><h2>Announcements</h2><p class="muted">Staff updates</p></div>${list}`, highestRank));
 });
-
 app.get('/notifications', checkAccess, async (req, res) => {
   const highestRank = await getHighestRoleName(req.user.id);
-  const notes = read(files.audit).filter(l => ['notification', 'announcement', 'loa_approved', 'loa_denied', 'ticket_create'].includes(l.type)).reverse().slice(0, 50);
-  const list = notes.map(n => `<div class="card"><strong>${n.type}</strong><p class="muted">${n.detail || ''}</p><small class="muted">${n.actor || 'System'} · ${new Date(n.at).toLocaleString()}</small></div>`).join('') || '<p class="muted">No notifications</p>';
+  const notes = read(files.audit).filter(l => ['notification','announcement','loa_approved','loa_denied','ticket_create'].includes(l.type)).reverse().slice(0,50);
+  const list = notes.map(n => `<div class="card"><strong>${n.type}</strong><p class="muted">${n.detail||''}</p><small class="muted">${n.actor||'System'} · ${new Date(n.at).toLocaleString()}</small></div>`).join('') || '<p class="muted">No notifications</p>';
   res.send(layout(req.user, 'Notifications', `<div class="hero"><h2>Notifications</h2></div>${list}`, highestRank));
 });
-
 app.get('/admin/announcements', checkAccess, async (req, res) => {
   if (!req.user.hasBotManagement) return res.redirect('/announcements');
   const highestRank = await getHighestRoleName(req.user.id);
@@ -889,7 +1076,8 @@ app.get('/admin/announcements', checkAccess, async (req, res) => {
   res.send(layout(req.user, 'Admin Announcements', `
     <div class="card"><h2>Post Announcement</h2>
       <form method="POST" action="/admin/announcements/create">
-        <input name="title" required/><textarea name="content" required rows="4"></textarea>
+        <input name="title" required placeholder="Title"/>
+        <textarea name="content" required rows="4"></textarea>
         <button class="btn" type="submit">Publish</button>
       </form>
     </div>${list}
@@ -903,12 +1091,11 @@ app.post('/admin/announcements/create', checkAccess, (req, res) => {
   addAudit({ type: 'announcement', actorId: req.user.id, actor: req.user.username, detail: req.body.title });
   res.redirect('/admin/announcements');
 });
-
 app.get('/logs', checkAccess, async (req, res) => {
   if (!req.user.hasBotManagement) return res.redirect('/dashboard');
   const highestRank = await getHighestRoleName(req.user.id);
-  const rows = read(files.audit).slice().reverse().slice(0, 400).map(l => `<div class="card" style="padding:14px"><strong>${l.type}</strong> <span class="muted">${new Date(l.at).toLocaleString()}</span><p style="margin-top:6px"><strong>${l.actor || 'System'}</strong>: ${l.detail || ''}</p></div>`).join('') || '<p class="muted">No logs yet. New actions will appear here.</p>';
-  res.send(layout(req.user, 'Logs', `<div class="hero"><h2>Audit Logs</h2><p class="muted">Website + LOA + ticket activity</p></div>${rows}`, highestRank));
+  const rows = read(files.audit).slice().reverse().slice(0,400).map(l => `<div class="card" style="padding:14px"><strong>${l.type}</strong> <span class="muted">${new Date(l.at).toLocaleString()}</span><p style="margin-top:6px"><strong>${l.actor||'System'}</strong>: ${l.detail||''}</p></div>`).join('') || '<p class="muted">No logs yet.</p>';
+  res.send(layout(req.user, 'Logs', `<div class="hero"><h2>Audit Logs</h2><p class="muted">Website activity stream</p></div>${rows}`, highestRank));
 });
 
 app.get('/settings', checkAccess, async (req, res) => {
@@ -942,7 +1129,7 @@ app.get('/settings', checkAccess, async (req, res) => {
     const rows = (config.notificationOptions||[]).map(o => `<div class="switch-row"><div><strong>${o.label}</strong></div><label class="switch"><input type="checkbox" name="notif_${o.key}" ${p.notifications[o.key]?'checked':''}/><span class="slider"></span></label></div>`).join('');
     body = `<div class="card"><form method="POST" action="/settings/notifications">${rows}<button class="btn" type="submit" style="margin-top:12px">Save Notifications</button></form></div>`;
   }
-  res.send(layout(req.user, 'Settings', `<div class="hero"><h2>Settings</h2></div>${tabs}${body}`, highestRank));
+  res.send(layout(req.user, 'Settings', `<div class="hero"><h2>Settings</h2><p class="muted">Profile, appearance, and notification preferences.</p></div>${tabs}${body}`, highestRank));
 });
 app.post('/settings/profile', checkAccess, (req, res) => {
   saveProfile(req.user.id, { displayName: req.body.displayName||'', tagline: req.body.tagline||'', bio: req.body.bio||'', bannerUrl: req.body.bannerUrl||'', timezone: req.body.timezone||'America/Chicago' });
