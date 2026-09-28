@@ -24,4 +24,22 @@ module.exports = {
     "What are you most proud of this month?"
   ],
   badWords: ["fuck", "shit", "bitch", "asshole", "nigger", "faggot", "cunt", "retard"]
+
+  notificationOptions: [
+    { key: "discordDms", label: "Discord notifications (bot DMs)" },
+    { key: "websiteAlerts", label: "Website / desktop alerts" },
+    { key: "interfaceSounds", label: "Interface sounds" },
+    { key: "ticketUpdates", label: "Ticket updates" },
+    { key: "ticketReminder", label: "Ticket reminder" },
+    { key: "payoutAlerts", label: "Payout alerts" },
+    { key: "entryUpdates", label: "Entry updates" },
+    { key: "projectUpdates", label: "Project updates" },
+    { key: "leaveUpdates", label: "Leave updates" },
+    { key: "eventUpdates", label: "Event updates" },
+    { key: "surveyUpdates", label: "Survey updates" },
+    { key: "safetyReports", label: "Safety reports" },
+    { key: "investigationCases", label: "Investigation cases" },
+    { key: "jobApplications", label: "Job applications" },
+    { key: "bugReports", label: "Bug reports" }
+  ]
 };
