@@ -169,7 +169,7 @@ async function postLoaReviewMessage(loa) {
           title: 'Leave of Absence Request',
           color: 0x38bdf8,
           fields: [
-            { name: 'Staff', value: `${loa.username}\\n\\`${loa.userId}\\``, inline: true },
+           { name: 'Staff', value: loa.username + '\n`' + loa.userId + '`', inline: true },
             { name: 'Available for basics?', value: loa.availableBasics ? 'Yes' : 'No', inline: true },
             { name: 'Dates', value: `${loa.start} → ${loa.end}` },
             { name: 'Reason', value: loa.reason || '—' }
