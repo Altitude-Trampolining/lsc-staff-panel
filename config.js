@@ -12,13 +12,13 @@ module.exports = {
     tickets: "KEY | Tickets"
   },
 
-  colors: {
-    primary: "#0ea5e9",
-    accent: "#B30838",
-    background: "#050814",
-    card: "#0c1322",
-    text: "#eef3fb",
-    muted: "#8b9bb8"
+ colors: {
+    primary: "#38bdf8",
+    accent: "#fb7185",
+    background: "#070b14",
+    card: "#0d1524",
+    text: "#f1f5f9",
+    muted: "#94a3b8"
   },
 
   questionsOfTheDay: [
