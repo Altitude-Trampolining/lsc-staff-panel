@@ -870,4 +870,423 @@ app.get('/support/macros', checkAccess, async function (req, res) {
   const list = macros.map(function (m) {
     return '<div class="card"><strong>' + m.title + '</strong> <span class="badge">' + (m.active ? 'Active' : 'Inactive') + '</span><p class="muted">' + m.content + '</p>' +
       '<form method="POST" action="/support/macros/' + m.id + '/toggle" style="display:inline"><button class="btn btn-outline" type="submit">Toggle</button></form> ' +
-      '<form method="POST" action="/support/macros/' + m.id + '/delete" style="display:inline"><button class="btn 
+      '<form method="POST" action="/support/macros/' + m.id + '/delete" style="display:inline"><button class="btn btn-outline" type="submit">Delete</button></form></div>';
+  }).join('') || '<p class="muted">No macros</p>';
+  res.send(layout(req.user, 'Support',
+    '<div class="card"><h2>Create Macro</h2><form method="POST" action="/support/macros/create"><input name="title" required/><textarea name="content" required rows="4"></textarea><button class="btn" type="submit">Save</button></form></div>' + list,
+    highestRank
+  ));
+});
+app.post('/support/macros/create', checkAccess, function (req, res) {
+  const macros = read(files.macros);
+  macros.push({
+    id: Date.now().toString(),
+    title: req.body.title,
+    content: req.body.content,
+    active: true,
+    createdBy: req.user.username,
+    createdAt: new Date().toISOString()
+  });
+  save(files.macros, macros);
+  res.redirect(withToast('/support/macros', 'Macro saved'));
+});
+app.post('/support/macros/:id/toggle', checkAccess, function (req, res) {
+  const macros = read(files.macros);
+  const m = macros.find(function (x) { return x.id === req.params.id; });
+  if (m) m.active = !m.active;
+  save(files.macros, macros);
+  res.redirect(withToast('/support/macros', 'Macro updated'));
+});
+app.post('/support/macros/:id/delete', checkAccess, function (req, res) {
+  save(files.macros, read(files.macros).filter(function (x) { return x.id !== req.params.id; }));
+  res.redirect(withToast('/support/macros', 'Macro deleted'));
+});
+
+function isAwayToday(loa) {
+  if (loa.status !== 'approved') return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(loa.start); start.setHours(0, 0, 0, 0);
+  const end = new Date(loa.end); end.setHours(0, 0, 0, 0);
+  return today >= start && today <= end;
+}
+
+app.get('/loa', checkAccess, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const loas = read(files.loa);
+  const pending = loas.filter(function (l) { return l.status === 'pending'; }).length;
+  const awayToday = loas.filter(isAwayToday).length;
+  const approved = loas.filter(function (l) { return l.status === 'approved'; }).length;
+  const denied = loas.filter(function (l) { return l.status === 'denied'; }).length;
+  const status = req.query.status || 'all';
+  const q = String(req.query.q || '').toLowerCase();
+  let filtered = loas.slice().reverse();
+  if (status !== 'all') filtered = filtered.filter(function (l) { return l.status === status; });
+  if (q) {
+    filtered = filtered.filter(function (l) {
+      return String(l.username || '').toLowerCase().indexOf(q) >= 0 || String(l.reason || '').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  const list = filtered.map(function (l) {
+    const badge = l.status === 'approved' ? 'badge-green' : l.status === 'denied' ? 'badge-red' : 'badge-yellow';
+    return '<div class="card"><strong>' + l.username + '</strong> <span class="badge ' + badge + '">' + l.status + '</span>' +
+      '<p class="muted" style="margin-top:8px">' + l.reason + '</p>' +
+      '<small class="muted">' + l.start + ' → ' + l.end + ' · Basics: ' + (l.availableBasics ? 'Yes' : 'No') + '</small>' +
+      (l.denyReason ? ('<p class="muted">Denied: ' + l.denyReason + '</p>') : '') +
+      (l.reviewNote ? ('<p class="muted">Note: ' + l.reviewNote + '</p>') : '') +
+      '</div>';
+  }).join('') || '<p class="muted">No leave requests found.</p>';
+
+  res.send(layout(req.user, 'LOA',
+    '<div class="hero"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">' +
+    '<div><h2>Leave of Absence</h2><p class="muted">Track pending, approved, and denied leave.</p></div>' +
+    '<button class="btn" type="button" onclick="document.getElementById(\'loaForm\').style.display=\'block\'">Request Leave</button></div></div>' +
+    '<div class="grid-4">' +
+    '<div class="card"><div class="stat">' + pending + '</div><p class="muted">Waiting Review</p></div>' +
+    '<div class="card"><div class="stat">' + awayToday + '</div><p class="muted">Away Today</p></div>' +
+    '<div class="card"><div class="stat">' + approved + '</div><p class="muted">All-time Approved</p></div>' +
+    '<div class="card"><div class="stat">' + denied + '</div><p class="muted">All-time Denials</p></div></div>' +
+    '<div class="card" id="loaForm" style="display:none"><h2>Request Leave</h2><form method="POST" action="/loa/request">' +
+    '<textarea name="reason" required rows="3" placeholder="Reason"></textarea>' +
+    '<div class="grid"><div><label class="muted">First day away</label><input type="date" name="start" required/></div>' +
+    '<div><label class="muted">Day back</label><input type="date" name="end" required/></div></div>' +
+    '<div class="switch-row"><div><strong>Available for basic duties?</strong></div>' +
+    '<label class="switch"><input type="checkbox" name="availableBasics"/><span class="slider"></span></label></div>' +
+    '<button class="btn" type="submit">Submit Leave Request</button></form></div>' +
+    '<div class="card"><form method="GET" action="/loa" style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">' +
+    '<div><label class="muted">Search</label><input name="q" value="' + (req.query.q || '') + '"/></div>' +
+    '<div><label class="muted">Status</label><select name="status"><option value="all">All</option><option value="pending"' + (status === 'pending' ? ' selected' : '') + '>Pending</option><option value="approved"' + (status === 'approved' ? ' selected' : '') + '>Approved</option><option value="denied"' + (status === 'denied' ? ' selected' : '') + '>Denied</option></select></div>' +
+    '<button class="btn" type="submit">Filter</button></form></div>' + list,
+    highestRank
+  ));
+});
+
+app.post('/loa/request', checkAccess, async function (req, res) {
+  const loas = read(files.loa);
+  const loa = {
+    id: Date.now().toString(),
+    userId: req.user.id,
+    username: req.user.username,
+    reason: req.body.reason,
+    start: req.body.start,
+    end: req.body.end,
+    availableBasics: !!req.body.availableBasics,
+    status: 'pending',
+    active: false,
+    createdAt: new Date().toISOString()
+  };
+  loas.push(loa);
+  save(files.loa, loas);
+  addAudit({ type: 'loa_request', actorId: req.user.id, actor: req.user.username, detail: 'LOA ' + loa.id });
+  await postLoaReviewMessage(loa);
+  res.redirect(withToast('/loa', 'Leave request submitted'));
+});
+
+app.get('/announcements', checkAccess, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const list = read(files.announcements).reverse().map(function (a) {
+    return '<div class="card"><strong>' + a.title + '</strong><p class="muted">' + a.content + '</p><small class="muted">By ' + a.author + '</small></div>';
+  }).join('') || '<p class="muted">No announcements</p>';
+  res.send(layout(req.user, 'Announcements', '<div class="hero"><h2>Announcements</h2></div>' + list, highestRank));
+});
+
+app.get('/notifications', checkAccess, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const notes = read(files.audit)
+    .filter(function (l) {
+      return ['notification', 'announcement', 'loa_approved', 'loa_denied', 'ticket_create', 'timeout_set', 'force_message'].indexOf(l.type) >= 0;
+    })
+    .reverse()
+    .slice(0, 50);
+  const list = notes.map(function (n) {
+    return '<div class="card"><strong>' + n.type + '</strong><p class="muted">' + (n.detail || '') + '</p><small class="muted">' + (n.actor || 'System') + ' · ' + new Date(n.at).toLocaleString() + '</small></div>';
+  }).join('') || '<p class="muted">No notifications</p>';
+  res.send(layout(req.user, 'Notifications', '<div class="hero"><h2>Notifications</h2></div>' + list, highestRank));
+});
+
+app.get('/admin/announcements', checkAccess, requireBotMgmt, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const list = read(files.announcements).reverse().map(function (a) {
+    return '<div class="card"><strong>' + a.title + '</strong><p class="muted">' + a.content + '</p></div>';
+  }).join('') || '<p class="muted">None</p>';
+  res.send(layout(req.user, 'Admin Announcements',
+    '<div class="card"><h2>Post Announcement</h2><form method="POST" action="/admin/announcements/create"><input name="title" required/><textarea name="content" required rows="4"></textarea><button class="btn" type="submit">Publish</button></form></div>' + list,
+    highestRank
+  ));
+});
+app.post('/admin/announcements/create', checkAccess, requireBotMgmt, function (req, res) {
+  const a = read(files.announcements);
+  a.push({
+    id: Date.now(),
+    title: req.body.title,
+    content: req.body.content,
+    author: req.user.username,
+    createdAt: new Date().toISOString()
+  });
+  save(files.announcements, a);
+  addAudit({ type: 'announcement', actorId: req.user.id, actor: req.user.username, detail: req.body.title });
+  res.redirect(withToast('/admin/announcements', 'Announcement published'));
+});
+
+app.get('/logs', checkAccess, requireBotMgmt, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const rows = read(files.audit).slice().reverse().slice(0, 400).map(function (l) {
+    return '<div class="card" style="padding:14px"><strong>' + l.type + '</strong> <span class="muted">' + new Date(l.at).toLocaleString() + '</span><p style="margin-top:6px"><strong>' + (l.actor || 'System') + '</strong>: ' + (l.detail || '') + '</p></div>';
+  }).join('') || '<p class="muted">No logs yet.</p>';
+  res.send(layout(req.user, 'Logs', '<div class="hero"><h2>Audit Logs</h2></div>' + rows, highestRank));
+});
+
+app.get('/admin', checkAccess, requireBotMgmt, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const timeouts = read(files.timeouts).filter(function (t) {
+    return new Date(t.until).getTime() > Date.now();
+  });
+  const logs = read(files.audit).slice().reverse().slice(0, 100);
+  const timeoutList = timeouts.map(function (t) {
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)"><strong>' + (t.username || t.userId) + '</strong><br/><span class="muted">' + t.reason + ' · until ' + new Date(t.until).toLocaleString() + ' · by ' + t.by + '</span>' +
+      '<form method="POST" action="/admin/timeout/clear" style="margin-top:8px"><input type="hidden" name="userId" value="' + t.userId + '"/><button class="btn btn-outline" type="submit">Clear</button></form></div>';
+  }).join('') || '<p class="muted">None</p>';
+  const logList = logs.map(function (l) {
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)"><strong>' + l.type + '</strong> <span class="muted">' + new Date(l.at).toLocaleString() + '</span><div>' + (l.actor || 'System') + ': ' + (l.detail || '') + '</div></div>';
+  }).join('') || '<p class="muted">No logs</p>';
+
+  res.send(layout(req.user, 'Admin',
+    '<div class="hero"><h2>Administration</h2><p class="muted">Live sessions, timeouts, force messages, and expanded logs. Bot Management only.</p></div>' +
+    '<div class="grid">' +
+    '<div class="card"><h2>Live sessions</h2><p class="muted">On-site activity only. Tab switch = left page.</p>' +
+    '<div id="sessionList" class="muted">Connecting…</div>' +
+    '<div id="liveStage" style="margin-top:12px;min-height:280px;background:#000;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#94a3b8;position:relative;overflow:hidden">' +
+    '<div id="liveStatus">Select a session</div><div id="player" style="position:absolute;inset:0"></div></div></div>' +
+    '<div class="card"><h2>Timeout staff</h2><form method="POST" action="/admin/timeout">' +
+    '<input name="userId" required placeholder="Discord user ID"/>' +
+    '<input name="minutes" type="number" min="1" value="60" required/>' +
+    '<textarea name="reason" required rows="3" placeholder="Reason"></textarea>' +
+    '<button class="btn" type="submit">Apply timeout</button></form>' +
+    '<h2 style="margin-top:18px">Active timeouts</h2>' + timeoutList + '</div></div>' +
+    '<div class="card"><h2>Force message</h2><p class="muted">Shows a modal on next page load. User must click OK.</p>' +
+    '<form method="POST" action="/admin/message"><input name="userId" required placeholder="Discord user ID"/>' +
+    '<textarea name="message" required rows="3"></textarea><button class="btn" type="submit">Send message</button></form></div>' +
+    '<div class="card"><h2>Expanded logs</h2>' + logList + '</div>' +
+    '<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>' +
+    '<script src="https://cdn.jsdelivr.net/npm/rrweb-player@0.7.14/dist/index.js"></script>' +
+    '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@0.7.14/dist/style.css"/>' +
+    '<script>(function(){var socket=io({path:"/socket.io"});var watching=null;var player=null;var eventsBuffer=[];' +
+    'socket.emit("admin:join");socket.on("admin:denied",function(){document.getElementById("sessionList").textContent="Access denied"});' +
+    'socket.on("session:update",function(list){var el=document.getElementById("sessionList");if(!list||!list.length){el.innerHTML="<p class=\\"muted\\">No active sessions</p>";return}' +
+    'el.innerHTML=list.map(function(s){var state=s.visible?"Active on page":"Left page / tab hidden";return "<div style=\\"display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)\\"><div><strong>"+s.username+"</strong><div class=\\"muted\\">"+s.page+" · "+state+"</div></div><button class=\\"btn btn-outline\\" type=\\"button\\" data-uid=\\""+s.userId+"\\">Watch</button></div>"}).join("");' +
+    'Array.prototype.forEach.call(el.querySelectorAll("button[data-uid]"),function(btn){btn.onclick=function(){watchUser(btn.getAttribute("data-uid"))}})});' +
+    'window.watchUser=function(userId){if(watching)socket.emit("admin:unwatch",watching);watching=userId;eventsBuffer=[];document.getElementById("liveStatus").textContent="Waiting for events…";document.getElementById("player").innerHTML="";player=null;socket.emit("admin:watch",userId)};' +
+    'socket.on("session:left",function(payload){if(!watching||payload.userId!==watching)return;document.getElementById("liveStatus").textContent="User left the page";document.getElementById("player").style.opacity="0.15"});' +
+    'socket.on("session:events",function(payload){if(!watching||payload.userId!==watching)return;document.getElementById("player").style.opacity="1";document.getElementById("liveStatus").textContent="";var evs=payload.events||[];eventsBuffer=eventsBuffer.concat(evs);' +
+    'if(!player&&eventsBuffer.length>2&&window.rrwebPlayer){document.getElementById("player").innerHTML="";player=new rrwebPlayer({target:document.getElementById("player"),props:{events:eventsBuffer.slice(),autoPlay:true,showController:false}})}})})();</script>',
+    highestRank
+  ));
+});
+
+app.post('/admin/timeout', checkAccess, requireBotMgmt, function (req, res) {
+  const minutes = Math.max(1, parseInt(req.body.minutes || '60', 10));
+  const until = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+  const list = read(files.timeouts).filter(function (t) {
+    return String(t.userId) !== String(req.body.userId);
+  });
+  list.push({
+    userId: String(req.body.userId),
+    username: req.body.userId,
+    reason: req.body.reason || 'No reason provided',
+    by: req.user.username,
+    byId: req.user.id,
+    until: until,
+    createdAt: new Date().toISOString()
+  });
+  save(files.timeouts, list);
+  addAudit({
+    type: 'timeout_set',
+    actorId: req.user.id,
+    actor: req.user.username,
+    detail: 'Timeout ' + req.body.userId + ' until ' + until + ' — ' + req.body.reason
+  });
+  res.redirect(withToast('/admin', 'Timeout applied'));
+});
+
+app.post('/admin/timeout/clear', checkAccess, requireBotMgmt, function (req, res) {
+  save(
+    files.timeouts,
+    read(files.timeouts).filter(function (t) {
+      return String(t.userId) !== String(req.body.userId);
+    })
+  );
+  addAudit({
+    type: 'timeout_clear',
+    actorId: req.user.id,
+    actor: req.user.username,
+    detail: 'Cleared timeout for ' + req.body.userId
+  });
+  res.redirect(withToast('/admin', 'Timeout cleared'));
+});
+
+app.post('/admin/message', checkAccess, requireBotMgmt, function (req, res) {
+  const list = read(files.forceMessages).filter(function (m) {
+    return String(m.userId) !== String(req.body.userId);
+  });
+  list.push({
+    userId: String(req.body.userId),
+    message: req.body.message,
+    by: req.user.username,
+    createdAt: new Date().toISOString()
+  });
+  save(files.forceMessages, list);
+  addAudit({
+    type: 'force_message',
+    actorId: req.user.id,
+    actor: req.user.username,
+    detail: 'Message to ' + req.body.userId
+  });
+  res.redirect(withToast('/admin', 'Message queued'));
+});
+
+app.get('/settings', checkAccess, async function (req, res) {
+  const highestRank = await getHighestRoleName(req.user.id);
+  const p = getProfile(req.user.id);
+  const tab = req.query.tab || 'profile';
+  const tabs =
+    '<div class="btn-row" style="margin-bottom:18px">' +
+    '<a class="btn ' + (tab === 'profile' ? '' : 'btn-outline') + '" href="/settings?tab=profile">Profile</a>' +
+    '<a class="btn ' + (tab === 'account' ? '' : 'btn-outline') + '" href="/settings?tab=account">Account</a>' +
+    '<a class="btn ' + (tab === 'appearance' ? '' : 'btn-outline') + '" href="/settings?tab=appearance">Appearance</a>' +
+    '<a class="btn ' + (tab === 'notifications' ? '' : 'btn-outline') + '" href="/settings?tab=notifications">Notifications</a></div>';
+
+  let body = '';
+  if (tab === 'profile') {
+    body = '<div class="card"><form method="POST" action="/settings/profile">' +
+      '<input name="displayName" value="' + (p.displayName || '') + '" placeholder="Display name"/>' +
+      '<input name="tagline" value="' + (p.tagline || '') + '" placeholder="Tagline"/>' +
+      '<textarea name="bio" rows="4">' + (p.bio || '') + '</textarea>' +
+      '<input name="bannerUrl" value="' + (p.bannerUrl || '') + '" placeholder="Banner URL"/>' +
+      '<input name="timezone" value="' + (p.timezone || 'America/Chicago') + '"/>' +
+      '<button class="btn" type="submit">Save</button></form></div>';
+  } else if (tab === 'account') {
+    body = '<div class="card"><p><strong>Discord ID:</strong> ' + req.user.id + '</p><p><strong>Username:</strong> ' + req.user.username + '</p><p><strong>Rank:</strong> ' + highestRank + '</p></div>';
+  } else if (tab === 'appearance') {
+    body = '<div class="card"><form method="POST" action="/settings/appearance">' +
+      '<input name="accent" value="' + (p.accent || config.colors.primary) + '"/>' +
+      '<div class="switch-row"><div><strong>Compact mode</strong></div><label class="switch"><input type="checkbox" name="compactMode"' + (p.compactMode ? ' checked' : '') + '/><span class="slider"></span></label></div>' +
+      '<div class="switch-row"><div><strong>Collapse sidebar by default</strong></div><label class="switch"><input type="checkbox" name="collapseSidebar"' + (p.collapseSidebar ? ' checked' : '') + '/><span class="slider"></span></label></div>' +
+      '<button class="btn" type="submit">Save</button></form></div>';
+  } else {
+    const rows = (config.notificationOptions || []).map(function (o) {
+      return '<div class="switch-row"><div><strong>' + o.label + '</strong></div><label class="switch"><input type="checkbox" name="notif_' + o.key + '"' + (p.notifications[o.key] ? ' checked' : '') + '/><span class="slider"></span></label></div>';
+    }).join('');
+    body = '<div class="card"><form method="POST" action="/settings/notifications">' + rows + '<button class="btn" type="submit" style="margin-top:12px">Save Notifications</button></form></div>';
+  }
+
+  res.send(layout(req.user, 'Settings', '<div class="hero"><h2>Settings</h2></div>' + tabs + body, highestRank));
+});
+
+app.post('/settings/profile', checkAccess, function (req, res) {
+  saveProfile(req.user.id, {
+    displayName: req.body.displayName || '',
+    tagline: req.body.tagline || '',
+    bio: req.body.bio || '',
+    bannerUrl: req.body.bannerUrl || '',
+    timezone: req.body.timezone || 'America/Chicago'
+  });
+  res.redirect(withToast('/settings?tab=profile', 'Profile saved'));
+});
+app.post('/settings/appearance', checkAccess, function (req, res) {
+  saveProfile(req.user.id, {
+    accent: req.body.accent || config.colors.primary,
+    compactMode: !!req.body.compactMode,
+    collapseSidebar: !!req.body.collapseSidebar
+  });
+  res.redirect(withToast('/settings?tab=appearance', 'Appearance updated'));
+});
+app.post('/settings/notifications', checkAccess, function (req, res) {
+  const notifications = {};
+  (config.notificationOptions || []).forEach(function (o) {
+    notifications[o.key] = !!req.body['notif_' + o.key];
+  });
+  saveProfile(req.user.id, { notifications: notifications });
+  res.redirect(withToast('/settings?tab=notifications', 'Notification preferences saved'));
+});
+
+// ===== Socket.io live sessions =====
+const server = http.createServer(app);
+const io = new Server(server, { path: '/socket.io' });
+const liveSessions = new Map();
+
+io.engine.use(sessionMiddleware);
+
+io.on('connection', function (socket) {
+  const sess = socket.request.session;
+  const user = sess && sess.passport && sess.passport.user;
+  if (!user) {
+    socket.disconnect(true);
+    return;
+  }
+
+  socket.data.userId = user.id;
+  socket.data.username = user.username || user.global_name || 'Staff';
+
+  socket.on('session:hello', function (payload) {
+    liveSessions.set(user.id, {
+      userId: user.id,
+      username: socket.data.username,
+      page: (payload && payload.page) || '/',
+      lastSeen: Date.now(),
+      visible: true
+    });
+    io.to('admins').emit('session:update', Array.from(liveSessions.values()));
+  });
+
+  socket.on('session:events', function (payload) {
+    const row = liveSessions.get(user.id);
+    if (!row) return;
+    row.lastSeen = Date.now();
+    row.visible = true;
+    row.page = (payload && payload.page) || row.page;
+    io.to('watch:' + user.id).emit('session:events', {
+      userId: user.id,
+      events: (payload && payload.events) ? payload.events : []
+    });
+    io.to('admins').emit('session:update', Array.from(liveSessions.values()));
+  });
+
+  socket.on('session:left', function () {
+    const row = liveSessions.get(user.id);
+    if (!row) return;
+    row.visible = false;
+    row.lastSeen = Date.now();
+    io.to('watch:' + user.id).emit('session:left', { userId: user.id });
+    io.to('admins').emit('session:update', Array.from(liveSessions.values()));
+  });
+
+  socket.on('admin:join', async function () {
+    try {
+      const memberRoles = await getMemberRoles(user.id);
+      const guildRoles = await getGuildRoles();
+      const botRole = guildRoles.find(function (r) { return r.name === config.roles.botManagement; });
+      const ok = botRole && memberRoles.indexOf(botRole.id) >= 0;
+      if (!ok) return socket.emit('admin:denied');
+      socket.join('admins');
+      socket.emit('session:update', Array.from(liveSessions.values()));
+    } catch (e) {
+      socket.emit('admin:denied');
+    }
+  });
+
+  socket.on('admin:watch', function (userId) {
+    socket.join('watch:' + userId);
+  });
+
+  socket.on('admin:unwatch', function (userId) {
+    socket.leave('watch:' + userId);
+  });
+
+  socket.on('disconnect', function () {
+    liveSessions.delete(user.id);
+    io.to('admins').emit('session:update', Array.from(liveSessions.values()));
+  });
+});
+
+server.listen(PORT, function () {
+  console.log('Staff Panel running on port ' + PORT);
+});
