@@ -1,6 +1,6 @@
 {
   "name": "lsc-staff-panel",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,6 +10,7 @@
     "express": "^4.21.0",
     "express-session": "^1.18.0",
     "passport": "^0.7.0",
-    "passport-discord": "^0.1.4"
+    "passport-discord": "^0.1.4",
+    "socket.io": "^4.8.1"
   }
 }
